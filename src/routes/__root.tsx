@@ -77,19 +77,33 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Lovable App" },
-      { name: "description", content: "Lovable Generated Project" },
-      { name: "author", content: "Lovable" },
-      { property: "og:title", content: "Lovable App" },
-      { property: "og:description", content: "Lovable Generated Project" },
+      { title: "Routh Location — Voiture & Hébergement en Guadeloupe" },
+      {
+        name: "description",
+        content:
+          "Réservez en quelques clics votre voiture de location et votre hébergement en Guadeloupe. Catalogue premium, disponibilité en temps réel, paiement sécurisé.",
+      },
+      { name: "author", content: "Routh Location" },
+      { property: "og:title", content: "Routh Location — Guadeloupe" },
+      {
+        property: "og:description",
+        content:
+          "Location de voitures et de logements en Guadeloupe. Réservation et paiement en ligne.",
+      },
       { property: "og:type", content: "website" },
-      { name: "twitter:card", content: "summary" },
-      { name: "twitter:site", content: "@Lovable" },
+      { name: "twitter:card", content: "summary_large_image" },
     ],
     links: [
+      { rel: "stylesheet", href: appCss },
+      { rel: "preconnect", href: "https://fonts.googleapis.com" },
+      {
+        rel: "preconnect",
+        href: "https://fonts.gstatic.com",
+        crossOrigin: "anonymous",
+      },
       {
         rel: "stylesheet",
-        href: appCss,
+        href: "https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300..700&family=Instrument+Sans:wght@400;500;600&display=swap",
       },
     ],
   }),
