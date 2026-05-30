@@ -1,29 +1,954 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { useEffect, useState, type FormEvent } from "react";
+import { AnimatePresence, motion } from "motion/react";
+import { useQuery } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
+import { getCatalog, createBooking } from "@/lib/booking.functions";
+import { resolveImage, heroGuadeloupe } from "@/assets";
+import {
+  BookingProvider,
+  useBooking,
+  nextStep,
+  prevStep,
+  type StepId,
+} from "@/features/booking/booking-context";
+import { ProgressBar } from "@/features/booking/progress-bar";
+import { StepShell } from "@/features/booking/step-shell";
+import { DEPOSIT_RATIO } from "@/lib/booking-schemas";
 
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Your App" },
-      { name: "description", content: "Replace this with a one-sentence description of your app." },
-      { property: "og:title", content: "Your App" },
-      { property: "og:description", content: "Replace this with a one-sentence description of your app." },
+      { title: "Routh Location — Voiture & Hébergement en Guadeloupe" },
+      {
+        name: "description",
+        content:
+          "Réservez votre voiture de location et votre hébergement en Guadeloupe. Catalogue premium, disponibilité en temps réel, paiement sécurisé.",
+      },
+      { property: "og:title", content: "Routh Location — Guadeloupe" },
+      {
+        property: "og:description",
+        content:
+          "Location voiture & logement en Guadeloupe — réservation et paiement en ligne.",
+      },
     ],
   }),
-  component: Index,
+  component: Page,
 });
 
-// IMPORTANT: Replace this placeholder. See ./README.md for routing conventions.
-function Index() {
+function Page() {
   return (
-    <div
-      className="flex min-h-screen items-center justify-center"
-      style={{ backgroundColor: "#fcfbf8" }}
-    >
-      <img
-        data-lovable-blank-page-placeholder="REMOVE_THIS"
-        src="https://cdn.gpteng.co/blank-app-v1.svg"
-        alt="Your app will live here!"
+    <BookingProvider>
+      <ProgressBar />
+      <main className="relative bg-surface">
+        <Stepper />
+      </main>
+      <Footer />
+    </BookingProvider>
+  );
+}
+
+function Stepper() {
+  const { state } = useBooking();
+  return (
+    <AnimatePresence mode="wait">
+      <motion.div key={state.step}>
+        {state.step === "intent" && <IntentStep />}
+        {state.step === "vehicle-locations" && <VehicleLocationsStep />}
+        {state.step === "vehicle-dates" && <VehicleDatesStep />}
+        {state.step === "vehicle-pick" && <VehiclePickStep />}
+        {state.step === "property-dates" && <PropertyDatesStep />}
+        {state.step === "property-pick" && <PropertyPickStep />}
+        {state.step === "customer" && <CustomerStep />}
+        {state.step === "recap" && <RecapStep />}
+        {state.step === "confirmation" && <ConfirmationStep />}
+      </motion.div>
+    </AnimatePresence>
+  );
+}
+
+/* =========================================================================
+   STEP 1 — Intent
+   ======================================================================= */
+
+function IntentStep() {
+  const { dispatch } = useBooking();
+  const choose = (value: "vehicle" | "property" | "both") => {
+    dispatch({ type: "SET_INTENT", value });
+    const next: StepId = value === "property" ? "property-dates" : "vehicle-locations";
+    dispatch({ type: "GO", step: next });
+  };
+  return (
+    <section className="relative min-h-screen flex flex-col justify-center py-20 px-6 sm:px-12 overflow-hidden">
+      <div
+        aria-hidden
+        className="absolute inset-0 -z-10 opacity-20"
+        style={{
+          backgroundImage: `url(${heroGuadeloupe})`,
+          backgroundSize: "cover",
+          backgroundPosition: "center",
+        }}
       />
+      <div className="absolute inset-0 -z-10 bg-gradient-to-b from-surface via-surface/70 to-surface" />
+      <div className="max-w-screen-xl mx-auto w-full">
+        <div className="max-w-[44ch] space-y-6">
+          <span className="text-xs uppercase tracking-[0.3em] text-brand font-medium">
+            Routh Location · Guadeloupe
+          </span>
+          <h1 className="text-4xl md:text-5xl lg:text-6xl font-medium font-serif leading-tight text-balance text-neutral-900">
+            Bienvenue en Guadeloupe. Que recherchez-vous pour votre séjour ?
+          </h1>
+          <p className="text-lg text-neutral-600 text-pretty max-w-[48ch]">
+            Sélectionnez l'option qui correspond à votre projet d'évasion dans l'archipel.
+          </p>
+        </div>
+
+        <div className="mt-12 grid grid-cols-1 md:grid-cols-3 gap-6">
+          <IntentCard
+            label="Une voiture"
+            sub="Liberté totale sur les routes de l'île."
+            onClick={() => choose("vehicle")}
+            icon={
+              <svg className="size-5 text-brand" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 18.75a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0zM19.5 18.75a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0z" />
+                <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12.75h19.5M5.25 7.5h13.5l1.5 5.25v5.25h-2.25M5.25 7.5L3.75 12.75v5.25h2.25" />
+              </svg>
+            }
+          />
+          <IntentCard
+            label="Un logement"
+            sub="Villas de caractère et havres de paix."
+            onClick={() => choose("property")}
+            icon={
+              <svg className="size-5 text-brand" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12 12 3l9.75 9M4.5 10.5V21h15V10.5" />
+              </svg>
+            }
+          />
+          <IntentCard
+            label="Les deux"
+            dark
+            sub="Le pack complet pour une sérénité maximale."
+            onClick={() => choose("both")}
+            icon={
+              <svg className="size-5 text-white" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12z" />
+              </svg>
+            }
+          />
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function IntentCard({ label, sub, icon, onClick, dark }: {
+  label: string; sub: string; icon: React.ReactNode; onClick: () => void; dark?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`group relative p-8 text-left rounded-2xl ring-1 transition-all duration-300 hover:-translate-y-1 ${
+        dark
+          ? "bg-accent text-white ring-black/5 hover:ring-brand/40"
+          : "bg-white ring-black/5 hover:ring-brand/40"
+      }`}
+    >
+      <div className={`size-10 mb-6 flex items-center justify-center rounded-full ${dark ? "bg-white/10" : "bg-brand/10"}`}>
+        {icon}
+      </div>
+      <h3 className={`text-xl font-medium mb-2 ${dark ? "text-white" : ""}`}>{label}</h3>
+      <p className={`text-sm ${dark ? "text-white/70" : "text-neutral-500"}`}>{sub}</p>
+    </button>
+  );
+}
+
+/* =========================================================================
+   STEP 2 — Vehicle locations
+   ======================================================================= */
+
+function useCatalog() {
+  const fn = useServerFn(getCatalog);
+  const { state } = useBooking();
+  return useQuery({
+    queryKey: [
+      "catalog",
+      state.vehicle.startISO,
+      state.vehicle.endISO,
+      state.property.checkin,
+      state.property.checkout,
+    ],
+    queryFn: () =>
+      fn({
+        data: {
+          vehicleStartISO: state.vehicle.startISO,
+          vehicleEndISO: state.vehicle.endISO,
+          propertyCheckin: state.property.checkin,
+          propertyCheckout: state.property.checkout,
+        },
+      }),
+  });
+}
+
+function VehicleLocationsStep() {
+  const { state, dispatch } = useBooking();
+  const { data, isLoading } = useCatalog();
+  const [pickup, setPickup] = useState<string | null>(state.vehicle.pickupLocationId);
+  const [dropoff, setDropoff] = useState<string | null>(state.vehicle.dropoffLocationId);
+  const [same, setSame] = useState(true);
+
+  useEffect(() => {
+    if (same && pickup) setDropoff(pickup);
+  }, [pickup, same]);
+
+  const submit = (e: FormEvent) => {
+    e.preventDefault();
+    if (!pickup || !dropoff) return;
+    dispatch({ type: "SET_VEHICLE_LOCATIONS", pickup, dropoff });
+    dispatch({ type: "GO", step: "vehicle-dates" });
+  };
+
+  return (
+    <StepShell
+      eyebrow="Étape voiture · Lieux"
+      title="Où prenez-vous, puis rendez-vous le véhicule ?"
+      description="Nous desservons trois points de retrait sur la partie centre de l'île."
+      onBack={() => dispatch({ type: "GO", step: "intent" })}
+    >
+      {isLoading ? (
+        <p className="text-sm text-neutral-500">Chargement…</p>
+      ) : (
+        <form onSubmit={submit} className="space-y-8">
+          <fieldset className="space-y-3">
+            <legend className="text-xs uppercase tracking-widest text-neutral-500 mb-2">Lieu de prise en charge</legend>
+            <div className="grid sm:grid-cols-3 gap-3">
+              {data?.locations.map((loc) => (
+                <button
+                  key={loc.id}
+                  type="button"
+                  onClick={() => setPickup(loc.id)}
+                  className={`px-5 py-4 rounded-xl text-left ring-1 transition-all ${
+                    pickup === loc.id
+                      ? "bg-accent text-white ring-accent"
+                      : "bg-white ring-black/5 hover:ring-brand/40"
+                  }`}
+                >
+                  <span className="block text-sm font-medium">{loc.name}</span>
+                </button>
+              ))}
+            </div>
+          </fieldset>
+
+          <label className="flex items-center gap-3 text-sm text-neutral-600 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={same}
+              onChange={(e) => setSame(e.target.checked)}
+              className="rounded border-neutral-300 text-brand focus:ring-brand"
+            />
+            Restitution au même endroit
+          </label>
+
+          {!same && (
+            <fieldset className="space-y-3">
+              <legend className="text-xs uppercase tracking-widest text-neutral-500 mb-2">Lieu de restitution</legend>
+              <div className="grid sm:grid-cols-3 gap-3">
+                {data?.locations.map((loc) => (
+                  <button
+                    key={loc.id}
+                    type="button"
+                    onClick={() => setDropoff(loc.id)}
+                    className={`px-5 py-4 rounded-xl text-left ring-1 transition-all ${
+                      dropoff === loc.id
+                        ? "bg-accent text-white ring-accent"
+                        : "bg-white ring-black/5 hover:ring-brand/40"
+                    }`}
+                  >
+                    <span className="block text-sm font-medium">{loc.name}</span>
+                  </button>
+                ))}
+              </div>
+            </fieldset>
+          )}
+
+          <PrimaryButton disabled={!pickup || !dropoff}>Continuer</PrimaryButton>
+        </form>
+      )}
+    </StepShell>
+  );
+}
+
+/* =========================================================================
+   STEP 3 — Vehicle dates
+   ======================================================================= */
+
+function VehicleDatesStep() {
+  const { state, dispatch } = useBooking();
+  const [start, setStart] = useState(state.vehicle.startISO?.slice(0, 16) ?? "");
+  const [end, setEnd] = useState(state.vehicle.endISO?.slice(0, 16) ?? "");
+  const [err, setErr] = useState<string | null>(null);
+
+  const submit = (e: FormEvent) => {
+    e.preventDefault();
+    setErr(null);
+    if (!start || !end) return;
+    const s = new Date(start);
+    const en = new Date(end);
+    if (en.getTime() <= s.getTime()) {
+      setErr("La date de retour doit être après la date de départ.");
+      return;
+    }
+    dispatch({
+      type: "SET_VEHICLE_DATES",
+      startISO: s.toISOString(),
+      endISO: en.toISOString(),
+    });
+    dispatch({ type: "GO", step: "vehicle-pick" });
+  };
+
+  const minDate = new Date().toISOString().slice(0, 16);
+
+  return (
+    <StepShell
+      eyebrow="Étape voiture · Dates"
+      title="Quand souhaitez-vous prendre la route ?"
+      onBack={() => dispatch({ type: "GO", step: "vehicle-locations" })}
+    >
+      <form onSubmit={submit} className="space-y-6">
+        <div className="grid sm:grid-cols-2 gap-4">
+          <Field label="Départ">
+            <input
+              type="datetime-local"
+              required
+              min={minDate}
+              value={start}
+              onChange={(e) => setStart(e.target.value)}
+              className="w-full px-4 py-3 rounded-xl bg-white ring-1 ring-black/5 focus:ring-brand focus:outline-none text-base"
+            />
+          </Field>
+          <Field label="Retour">
+            <input
+              type="datetime-local"
+              required
+              min={start || minDate}
+              value={end}
+              onChange={(e) => setEnd(e.target.value)}
+              className="w-full px-4 py-3 rounded-xl bg-white ring-1 ring-black/5 focus:ring-brand focus:outline-none text-base"
+            />
+          </Field>
+        </div>
+        {err && <p className="text-sm text-destructive">{err}</p>}
+        <PrimaryButton>Voir les véhicules disponibles</PrimaryButton>
+      </form>
+    </StepShell>
+  );
+}
+
+/* =========================================================================
+   STEP 4 — Vehicle pick
+   ======================================================================= */
+
+function VehiclePickStep() {
+  const { state, dispatch } = useBooking();
+  const { data, isLoading } = useCatalog();
+
+  const days = (() => {
+    if (!state.vehicle.startISO || !state.vehicle.endISO) return 1;
+    const s = new Date(state.vehicle.startISO).getTime();
+    const e = new Date(state.vehicle.endISO).getTime();
+    return Math.max(1, Math.ceil((e - s) / (1000 * 60 * 60 * 24)));
+  })();
+
+  const select = (id: string, pricePerDay: number, name: string) => {
+    dispatch({ type: "PICK_VEHICLE", id, pricePerDay, name });
+    const next = state.bookingType === "both" ? "property-dates" : "customer";
+    dispatch({ type: "GO", step: next });
+  };
+
+  return (
+    <StepShell
+      wide
+      eyebrow="Étape voiture · Sélection"
+      title="Explorez l'île en toute élégance"
+      description={`Notre flotte est rigoureusement sélectionnée pour le relief et le climat de la Guadeloupe. Tarifs pour ${days} jour${days > 1 ? "s" : ""}.`}
+      onBack={() => dispatch({ type: "GO", step: "vehicle-dates" })}
+    >
+      {isLoading ? (
+        <p className="text-sm text-neutral-500">Vérification des disponibilités…</p>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {data?.vehicles.map((v) => (
+            <article
+              key={v.id}
+              className={`group bg-white rounded-2xl overflow-hidden ring-1 ring-black/5 p-4 transition-all ${
+                !v.available ? "opacity-50 grayscale" : "hover:-translate-y-1"
+              }`}
+            >
+              <div className="w-full aspect-[4/3] bg-neutral-100 rounded-xl overflow-hidden">
+                <img
+                  src={resolveImage(v.image_url)}
+                  alt={v.name}
+                  loading="lazy"
+                  width={1024}
+                  height={768}
+                  className="w-full h-full object-cover"
+                />
+              </div>
+              <div className="mt-6 px-2 pb-2">
+                <div className="flex justify-between items-start gap-3">
+                  <div>
+                    <p className="text-xs uppercase tracking-widest text-neutral-400">{v.category}</p>
+                    <h3 className="text-lg font-medium">{v.name}</h3>
+                  </div>
+                  <span className="text-brand font-medium whitespace-nowrap">
+                    {v.price_per_day}€<span className="text-xs text-neutral-400">/jour</span>
+                  </span>
+                </div>
+                <div className="mt-4 flex flex-wrap gap-4 text-[11px] uppercase tracking-wider text-neutral-400 font-medium">
+                  <Pill>{v.transmission}</Pill>
+                  <Pill>{v.seats} places</Pill>
+                  <Pill>{v.fuel}</Pill>
+                </div>
+                {v.description && (
+                  <p className="mt-4 text-sm text-neutral-600">{v.description}</p>
+                )}
+                <button
+                  type="button"
+                  disabled={!v.available}
+                  onClick={() => select(v.id, Number(v.price_per_day), v.name)}
+                  className={`mt-6 w-full py-3 px-4 text-sm font-medium rounded-full transition-all ${
+                    v.available
+                      ? "bg-brand text-white hover:bg-brand/90"
+                      : "bg-neutral-100 text-neutral-500 cursor-not-allowed"
+                  }`}
+                >
+                  {v.available ? `Sélectionner · ${Number(v.price_per_day) * days}€` : "Indisponible"}
+                </button>
+              </div>
+            </article>
+          ))}
+        </div>
+      )}
+    </StepShell>
+  );
+}
+
+function Pill({ children }: { children: React.ReactNode }) {
+  return (
+    <span className="flex items-center gap-1.5">
+      <span className="size-1 bg-neutral-300 rounded-full" /> {children}
+    </span>
+  );
+}
+
+/* =========================================================================
+   STEP 5 — Property dates
+   ======================================================================= */
+
+function PropertyDatesStep() {
+  const { state, dispatch } = useBooking();
+  const [checkin, setCheckin] = useState(state.property.checkin ?? "");
+  const [checkout, setCheckout] = useState(state.property.checkout ?? "");
+  const [guests, setGuests] = useState(state.property.guests);
+  const [err, setErr] = useState<string | null>(null);
+
+  const submit = (e: FormEvent) => {
+    e.preventDefault();
+    setErr(null);
+    if (!checkin || !checkout) return;
+    if (checkout <= checkin) {
+      setErr("La date de départ doit être après l'arrivée.");
+      return;
+    }
+    dispatch({ type: "SET_PROPERTY_DATES", checkin, checkout, guests });
+    dispatch({ type: "GO", step: "property-pick" });
+  };
+
+  const today = new Date().toISOString().slice(0, 10);
+  const backStep: StepId = state.bookingType === "both" ? "vehicle-pick" : "intent";
+
+  return (
+    <StepShell
+      eyebrow="Étape logement · Dates"
+      title="Quand voulez-vous poser vos valises ?"
+      onBack={() => dispatch({ type: "GO", step: backStep })}
+    >
+      <form onSubmit={submit} className="space-y-6">
+        <div className="grid sm:grid-cols-2 gap-4">
+          <Field label="Arrivée">
+            <input
+              type="date" required min={today} value={checkin}
+              onChange={(e) => setCheckin(e.target.value)}
+              className="w-full px-4 py-3 rounded-xl bg-white ring-1 ring-black/5 focus:ring-brand focus:outline-none text-base"
+            />
+          </Field>
+          <Field label="Départ">
+            <input
+              type="date" required min={checkin || today} value={checkout}
+              onChange={(e) => setCheckout(e.target.value)}
+              className="w-full px-4 py-3 rounded-xl bg-white ring-1 ring-black/5 focus:ring-brand focus:outline-none text-base"
+            />
+          </Field>
+        </div>
+        <Field label="Nombre de voyageurs">
+          <input
+            type="number" min={1} max={20} required value={guests}
+            onChange={(e) => setGuests(Number(e.target.value))}
+            className="w-full px-4 py-3 rounded-xl bg-white ring-1 ring-black/5 focus:ring-brand focus:outline-none text-base"
+          />
+        </Field>
+        {err && <p className="text-sm text-destructive">{err}</p>}
+        <PrimaryButton>Voir les logements disponibles</PrimaryButton>
+      </form>
+    </StepShell>
+  );
+}
+
+/* =========================================================================
+   STEP 6 — Property pick
+   ======================================================================= */
+
+function PropertyPickStep() {
+  const { state, dispatch } = useBooking();
+  const { data, isLoading } = useCatalog();
+
+  const nights = (() => {
+    if (!state.property.checkin || !state.property.checkout) return 1;
+    const s = new Date(state.property.checkin).getTime();
+    const e = new Date(state.property.checkout).getTime();
+    return Math.max(1, Math.ceil((e - s) / (1000 * 60 * 60 * 24)));
+  })();
+
+  const select = (id: string, pricePerNight: number, name: string) => {
+    dispatch({ type: "PICK_PROPERTY", id, pricePerNight, name });
+    dispatch({ type: "GO", step: "customer" });
+  };
+
+  return (
+    <div>
+      {isLoading ? (
+        <StepShell title="Chargement…">
+          <p className="text-sm text-neutral-500">Vérification des disponibilités…</p>
+        </StepShell>
+      ) : (
+        <div className="bg-accent text-neutral-50 min-h-screen py-20 px-6">
+          <div className="max-w-screen-xl mx-auto">
+            <button
+              onClick={() => dispatch({ type: "GO", step: "property-dates" })}
+              className="mb-8 text-xs uppercase tracking-widest text-white/60 hover:text-brand transition-colors"
+            >
+              ← Retour
+            </button>
+            <div className="mb-12 max-w-[48ch]">
+              <span className="text-xs uppercase tracking-[0.2em] text-white/50 mb-4 block">
+                Hébergement d'exception
+              </span>
+              <h2 className="text-4xl md:text-5xl lg:text-6xl font-serif leading-none text-balance font-medium">
+                Vos logements pour {nights} nuit{nights > 1 ? "s" : ""}
+              </h2>
+            </div>
+
+            <div className="space-y-16">
+              {data?.properties.map((p) => (
+                <article key={p.id} className={!p.available ? "opacity-50" : ""}>
+                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-end mb-8">
+                    <div className="lg:col-span-8">
+                      <p className="text-xs uppercase tracking-widest text-brand mb-2">{p.location}</p>
+                      <h3 className="text-3xl md:text-4xl font-serif font-medium">{p.name}</h3>
+                    </div>
+                    <div className="lg:col-span-4 lg:text-right">
+                      <p className="text-2xl font-serif italic">
+                        {p.price_per_night}€
+                        <span className="text-sm uppercase tracking-widest not-italic opacity-60 ml-2">
+                          / nuit
+                        </span>
+                      </p>
+                      <p className="text-sm text-white/60 mt-1">
+                        Total {Number(p.price_per_night) * nights}€
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="w-full aspect-[16/7] bg-neutral-800 rounded-2xl overflow-hidden">
+                    <img
+                      src={resolveImage(p.image_urls?.[0])}
+                      alt={p.name}
+                      loading="lazy"
+                      width={1600}
+                      height={700}
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-12 mt-12">
+                    <div className="space-y-4">
+                      <h4 className="text-xs uppercase tracking-widest text-brand font-semibold">
+                        Équipements
+                      </h4>
+                      <ul className="space-y-3">
+                        {p.amenities?.slice(0, 6).map((a) => (
+                          <li key={a} className="flex items-center gap-3 text-sm text-neutral-300">
+                            <svg className="size-4 text-brand shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path d="M5 13l4 4L19 7" strokeWidth="2" />
+                            </svg>
+                            {a}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                    <div className="md:col-span-2 space-y-6">
+                      <p className="text-lg font-serif text-neutral-200 leading-relaxed text-pretty">
+                        {p.description}
+                      </p>
+                      <div className="flex flex-wrap gap-3 text-xs uppercase tracking-widest text-white/60">
+                        <span>{p.bedrooms} chambres</span>
+                        <span>·</span>
+                        <span>{p.capacity} voyageurs max</span>
+                      </div>
+                      <button
+                        type="button"
+                        disabled={!p.available}
+                        onClick={() => select(p.id, Number(p.price_per_night), p.name)}
+                        className={`inline-flex items-center py-3 pr-6 pl-2 text-sm font-medium rounded-full transition-transform ${
+                          p.available
+                            ? "bg-brand text-white hover:scale-[1.02]"
+                            : "bg-white/10 text-white/60 cursor-not-allowed"
+                        }`}
+                      >
+                        <span className="p-1.5 bg-white/20 rounded-full mr-3">
+                          <svg className="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path d="M12 4.5v15m7.5-7.5h-15" strokeWidth="2" />
+                          </svg>
+                        </span>
+                        {p.available ? "Sélectionner ce logement" : "Indisponible sur ces dates"}
+                      </button>
+                    </div>
+                  </div>
+                </article>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
+  );
+}
+
+/* =========================================================================
+   STEP 7 — Customer
+   ======================================================================= */
+
+function CustomerStep() {
+  const { state, dispatch } = useBooking();
+  const [form, setForm] = useState(state.customer);
+
+  const submit = (e: FormEvent) => {
+    e.preventDefault();
+    dispatch({ type: "SET_CUSTOMER", value: form });
+    dispatch({ type: "GO", step: "recap" });
+  };
+
+  return (
+    <StepShell
+      eyebrow="Vos coordonnées"
+      title="Quelques informations pour finaliser"
+      onBack={() => {
+        const back: StepId =
+          state.bookingType === "vehicle"
+            ? "vehicle-pick"
+            : "property-pick";
+        dispatch({ type: "GO", step: back });
+      }}
+    >
+      <form onSubmit={submit} className="space-y-5">
+        <Field label="Nom complet">
+          <input
+            required maxLength={120} value={form.name}
+            onChange={(e) => setForm({ ...form, name: e.target.value })}
+            className="w-full px-4 py-3 rounded-xl bg-white ring-1 ring-black/5 focus:ring-brand focus:outline-none"
+          />
+        </Field>
+        <div className="grid sm:grid-cols-2 gap-4">
+          <Field label="Email">
+            <input
+              required type="email" maxLength={200} value={form.email}
+              onChange={(e) => setForm({ ...form, email: e.target.value })}
+              className="w-full px-4 py-3 rounded-xl bg-white ring-1 ring-black/5 focus:ring-brand focus:outline-none"
+            />
+          </Field>
+          <Field label="Téléphone">
+            <input
+              required type="tel" maxLength={40} value={form.phone}
+              onChange={(e) => setForm({ ...form, phone: e.target.value })}
+              className="w-full px-4 py-3 rounded-xl bg-white ring-1 ring-black/5 focus:ring-brand focus:outline-none"
+            />
+          </Field>
+        </div>
+        {(state.bookingType === "vehicle" || state.bookingType === "both") && (
+          <Field label="N° de vol (optionnel)">
+            <input
+              maxLength={80} value={form.flight}
+              onChange={(e) => setForm({ ...form, flight: e.target.value })}
+              className="w-full px-4 py-3 rounded-xl bg-white ring-1 ring-black/5 focus:ring-brand focus:outline-none"
+            />
+          </Field>
+        )}
+        <PrimaryButton>Récapitulatif</PrimaryButton>
+      </form>
+    </StepShell>
+  );
+}
+
+/* =========================================================================
+   STEP 8 — Recap & payment
+   ======================================================================= */
+
+function RecapStep() {
+  const { state, dispatch } = useBooking();
+  const createFn = useServerFn(createBooking);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const vehicleDays = (() => {
+    if (!state.vehicle.startISO || !state.vehicle.endISO) return 0;
+    return Math.max(
+      1,
+      Math.ceil(
+        (new Date(state.vehicle.endISO).getTime() - new Date(state.vehicle.startISO).getTime()) /
+          (1000 * 60 * 60 * 24),
+      ),
+    );
+  })();
+  const propertyNights = (() => {
+    if (!state.property.checkin || !state.property.checkout) return 0;
+    return Math.max(
+      1,
+      Math.ceil(
+        (new Date(state.property.checkout).getTime() - new Date(state.property.checkin).getTime()) /
+          (1000 * 60 * 60 * 24),
+      ),
+    );
+  })();
+
+  const vehicleTotal = (state.vehicle.pricePerDay ?? 0) * vehicleDays;
+  const propertyTotal = (state.property.pricePerNight ?? 0) * propertyNights;
+  const total = vehicleTotal + propertyTotal;
+  const deposit = Math.round(total * DEPOSIT_RATIO * 100) / 100;
+  const charged = state.paymentMode === "full" ? total : deposit;
+
+  const confirm = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await createFn({
+        data: {
+          bookingType: state.bookingType!,
+          vehicleId: state.vehicle.vehicleId,
+          vehicleDates:
+            state.vehicle.startISO && state.vehicle.endISO && state.vehicle.pickupLocationId && state.vehicle.dropoffLocationId
+              ? {
+                  pickupLocationId: state.vehicle.pickupLocationId,
+                  dropoffLocationId: state.vehicle.dropoffLocationId,
+                  startISO: state.vehicle.startISO,
+                  endISO: state.vehicle.endISO,
+                }
+              : null,
+          propertyId: state.property.propertyId,
+          propertyDates:
+            state.property.checkin && state.property.checkout
+              ? {
+                  checkin: state.property.checkin,
+                  checkout: state.property.checkout,
+                  guests: state.property.guests,
+                }
+              : null,
+          customer: {
+            name: state.customer.name,
+            email: state.customer.email,
+            phone: state.customer.phone,
+            flight: state.customer.flight || null,
+          },
+          paymentMode: state.paymentMode,
+        },
+      });
+      dispatch({ type: "SET_BOOKING_REF", value: res.reference });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Erreur inconnue");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <StepShell
+      eyebrow="Récapitulatif"
+      title="Votre itinéraire"
+      description="Vérifiez les détails et choisissez votre mode de paiement."
+      onBack={() => dispatch({ type: "GO", step: "customer" })}
+    >
+      <div className="bg-white ring-1 ring-black/5 rounded-3xl p-8 space-y-6">
+        <div className="grid sm:grid-cols-2 gap-6 pb-6 border-b border-neutral-100">
+          <div>
+            <p className="text-xs uppercase tracking-widest text-neutral-400 mb-1">Client</p>
+            <p className="font-medium">{state.customer.name}</p>
+            <p className="text-sm text-neutral-500">{state.customer.email}</p>
+          </div>
+          <div>
+            <p className="text-xs uppercase tracking-widest text-neutral-400 mb-1">Téléphone</p>
+            <p className="font-medium">{state.customer.phone}</p>
+          </div>
+        </div>
+
+        <div className="space-y-3">
+          {vehicleTotal > 0 && (
+            <div className="flex justify-between">
+              <span className="text-neutral-600">
+                {state.vehicle.name} ({vehicleDays} jour{vehicleDays > 1 ? "s" : ""})
+              </span>
+              <span className="font-medium">{vehicleTotal}€</span>
+            </div>
+          )}
+          {propertyTotal > 0 && (
+            <div className="flex justify-between">
+              <span className="text-neutral-600">
+                {state.property.name} ({propertyNights} nuit{propertyNights > 1 ? "s" : ""})
+              </span>
+              <span className="font-medium">{propertyTotal}€</span>
+            </div>
+          )}
+        </div>
+
+        <div className="pt-6 border-t border-neutral-100 flex justify-between items-end">
+          <span className="text-lg font-serif">Total</span>
+          <span className="text-3xl font-serif text-accent">{total}€</span>
+        </div>
+      </div>
+
+      <fieldset className="mt-8 space-y-3">
+        <legend className="text-xs uppercase tracking-widest text-neutral-500 mb-2">
+          Mode de paiement
+        </legend>
+        <div className="grid sm:grid-cols-2 gap-3">
+          <PaymentChoice
+            selected={state.paymentMode === "deposit"}
+            onClick={() => dispatch({ type: "SET_PAYMENT_MODE", value: "deposit" })}
+            title="Acompte 30%"
+            sub={`Réservez avec ${deposit}€, solde sur place.`}
+          />
+          <PaymentChoice
+            selected={state.paymentMode === "full"}
+            onClick={() => dispatch({ type: "SET_PAYMENT_MODE", value: "full" })}
+            title="Paiement intégral"
+            sub={`Payez la totalité de ${total}€ en une fois.`}
+          />
+        </div>
+      </fieldset>
+
+      {error && <p className="mt-4 text-sm text-destructive">{error}</p>}
+
+      <div className="mt-8 space-y-3">
+        <button
+          onClick={confirm}
+          disabled={loading}
+          className="w-full py-4 bg-accent text-white rounded-full font-medium hover:bg-accent/90 transition-colors disabled:opacity-50"
+        >
+          {loading ? "Confirmation en cours…" : `Confirmer ma réservation · ${charged}€`}
+        </button>
+        <p className="text-[11px] text-center text-neutral-400 max-w-[48ch] mx-auto">
+          Votre réservation sera confirmée. Le paiement sécurisé en ligne sera activé prochainement —
+          en attendant nous vous contacterons par email pour finaliser le règlement.
+        </p>
+      </div>
+    </StepShell>
+  );
+}
+
+function PaymentChoice({ selected, onClick, title, sub }: {
+  selected: boolean; onClick: () => void; title: string; sub: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`p-5 text-left rounded-xl ring-1 transition-all ${
+        selected ? "bg-accent text-white ring-accent" : "bg-white ring-black/5 hover:ring-brand/40"
+      }`}
+    >
+      <div className="font-medium mb-1">{title}</div>
+      <div className={`text-xs ${selected ? "text-white/70" : "text-neutral-500"}`}>{sub}</div>
+    </button>
+  );
+}
+
+/* =========================================================================
+   STEP 9 — Confirmation
+   ======================================================================= */
+
+function ConfirmationStep() {
+  const { state, dispatch } = useBooking();
+  return (
+    <StepShell
+      eyebrow="Confirmation"
+      title="Merci, votre demande est enregistrée"
+      description={`Référence de réservation : ${state.bookingRef}. Vous recevrez un email à ${state.customer.email} avec les détails.`}
+    >
+      <div className="bg-white ring-1 ring-black/5 rounded-3xl p-8">
+        <p className="text-sm text-neutral-600 leading-relaxed">
+          Notre équipe revient vers vous sous peu pour finaliser le paiement et organiser
+          votre prise en charge. Pour toute question, contactez-nous directement par email
+          ou téléphone.
+        </p>
+      </div>
+      <button
+        onClick={() => dispatch({ type: "RESET" })}
+        className="mt-8 text-sm text-brand hover:underline"
+      >
+        Faire une nouvelle réservation
+      </button>
+    </StepShell>
+  );
+}
+
+/* =========================================================================
+   Shared UI
+   ======================================================================= */
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <label className="block space-y-2">
+      <span className="text-xs uppercase tracking-widest text-neutral-500">{label}</span>
+      {children}
+    </label>
+  );
+}
+
+function PrimaryButton({ children, disabled }: { children: React.ReactNode; disabled?: boolean }) {
+  return (
+    <button
+      type="submit"
+      disabled={disabled}
+      className="w-full sm:w-auto px-8 py-3.5 bg-accent text-white rounded-full font-medium hover:bg-accent/90 transition-colors disabled:opacity-50"
+    >
+      {children}
+    </button>
+  );
+}
+
+function Footer() {
+  return (
+    <footer className="py-12 px-6 border-t border-neutral-100 bg-surface">
+      <div className="max-w-screen-xl mx-auto flex flex-col md:flex-row justify-between items-center gap-6">
+        <div className="flex items-center gap-2">
+          <div className="size-2 bg-brand rounded-full" />
+          <span className="text-sm font-serif tracking-wider font-medium uppercase">
+            Routh Location
+          </span>
+        </div>
+        <p className="text-xs text-neutral-400">
+          Location voiture & logement · Guadeloupe
+        </p>
+      </div>
+    </footer>
   );
 }
