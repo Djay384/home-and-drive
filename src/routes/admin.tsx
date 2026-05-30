@@ -6,6 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import {
   adminListVehicles,
   adminUpdateVehicle,
+  adminVehicleHistory,
 } from "@/lib/admin.functions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
