@@ -232,6 +232,39 @@ export type Database = {
         }
         Relationships: []
       }
+      vehicle_audit: {
+        Row: {
+          changed_by: string
+          changed_by_email: string | null
+          created_at: string
+          field: string
+          id: string
+          new_value: string | null
+          old_value: string | null
+          vehicle_id: string
+        }
+        Insert: {
+          changed_by: string
+          changed_by_email?: string | null
+          created_at?: string
+          field: string
+          id?: string
+          new_value?: string | null
+          old_value?: string | null
+          vehicle_id: string
+        }
+        Update: {
+          changed_by?: string
+          changed_by_email?: string | null
+          created_at?: string
+          field?: string
+          id?: string
+          new_value?: string | null
+          old_value?: string | null
+          vehicle_id?: string
+        }
+        Relationships: []
+      }
       vehicles: {
         Row: {
           category: string
