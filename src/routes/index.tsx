@@ -289,6 +289,13 @@ function VehicleDatesStep() {
   const [end, setEnd] = useState(state.vehicle.endISO?.slice(0, 16) ?? "");
   const [err, setErr] = useState<string | null>(null);
 
+  const canSyncFromProperty = Boolean(state.property.checkin && state.property.checkout);
+  const syncFromProperty = () => {
+    if (!state.property.checkin || !state.property.checkout) return;
+    setStart(`${state.property.checkin}T10:00`);
+    setEnd(`${state.property.checkout}T18:00`);
+  };
+
   const submit = (e: FormEvent) => {
     e.preventDefault();
     setErr(null);
@@ -316,6 +323,9 @@ function VehicleDatesStep() {
       onBack={() => dispatch({ type: "GO", step: "vehicle-locations" })}
     >
       <form onSubmit={submit} className="space-y-6">
+        {canSyncFromProperty && (
+          <SyncDatesButton onClick={syncFromProperty} label="Aligner sur les dates du logement" />
+        )}
         <div className="grid sm:grid-cols-2 gap-4">
           <Field label="Départ">
             <input
@@ -342,6 +352,21 @@ function VehicleDatesStep() {
         <PrimaryButton>Voir les véhicules disponibles</PrimaryButton>
       </form>
     </StepShell>
+  );
+}
+
+function SyncDatesButton({ onClick, label }: { onClick: () => void; label: string }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="inline-flex items-center gap-2 px-4 py-2.5 rounded-full bg-brand/10 text-brand text-sm font-medium ring-1 ring-brand/20 hover:bg-brand/15 transition-colors"
+    >
+      <svg className="size-4" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" />
+      </svg>
+      {label}
+    </button>
   );
 }
 
