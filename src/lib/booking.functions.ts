@@ -3,8 +3,8 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import {
   checkAvailabilitySchema,
   createBookingSchema,
-  DEPOSIT_RATIO,
 } from "./booking-schemas";
+import { computeBookingPlan } from "./booking-pricing";
 
 /**
  * Returns the full active catalog (vehicles, properties, pickup locations)
