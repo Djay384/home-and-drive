@@ -3,8 +3,8 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import {
   checkAvailabilitySchema,
   createBookingSchema,
-  DEPOSIT_RATIO,
 } from "./booking-schemas";
+import { computeBookingPlan } from "./booking-pricing";
 
 /**
  * Returns the full active catalog (vehicles, properties, pickup locations)
@@ -105,100 +105,80 @@ export const getCatalog = createServerFn({ method: "POST" })
 export const createBooking = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => createBookingSchema.parse(input))
   .handler(async ({ data }) => {
-    // Compute durations and totals authoritatively (never trust client)
-    let vehicleTotal = 0;
-    let vehicleStart: string | null = null;
-    let vehicleEnd: string | null = null;
-    let vehicleId: string | null = null;
-
-    if (
+    // Always look up authoritative prices from the database — client input is never trusted.
+    const needVehicle =
       (data.bookingType === "vehicle" || data.bookingType === "both") &&
       data.vehicleId &&
-      data.vehicleDates
-    ) {
-      const { data: vehicle, error } = await supabaseAdmin
-        .from("vehicles")
-        .select("id, price_per_day, is_active")
-        .eq("id", data.vehicleId)
-        .single();
-      if (error || !vehicle || !vehicle.is_active) {
-        throw new Error("Véhicule indisponible");
-      }
-      const s = new Date(data.vehicleDates.startISO);
-      const e = new Date(data.vehicleDates.endISO);
-      if (e.getTime() <= s.getTime()) {
-        throw new Error("Dates de location véhicule invalides");
-      }
-      const days = Math.max(
-        1,
-        Math.ceil((e.getTime() - s.getTime()) / (1000 * 60 * 60 * 24)),
-      );
-      vehicleTotal = Number(vehicle.price_per_day) * days;
-      vehicleStart = data.vehicleDates.startISO;
-      vehicleEnd = data.vehicleDates.endISO;
-      vehicleId = vehicle.id;
-    }
-
-    let propertyTotal = 0;
-    let propertyCheckin: string | null = null;
-    let propertyCheckout: string | null = null;
-    let propertyId: string | null = null;
-    let propertyGuests: number | null = null;
-
-    if (
+      data.vehicleDates;
+    const needProperty =
       (data.bookingType === "property" || data.bookingType === "both") &&
       data.propertyId &&
-      data.propertyDates
-    ) {
-      const { data: property, error } = await supabaseAdmin
-        .from("properties")
-        .select("id, price_per_night, is_active, capacity")
-        .eq("id", data.propertyId)
-        .single();
-      if (error || !property || !property.is_active) {
-        throw new Error("Logement indisponible");
-      }
-      if (data.propertyDates.guests > property.capacity) {
-        throw new Error(`Capacité maximale dépassée (${property.capacity} voyageurs)`);
-      }
-      const s = new Date(data.propertyDates.checkin + "T00:00:00Z");
-      const e = new Date(data.propertyDates.checkout + "T00:00:00Z");
-      if (e.getTime() <= s.getTime()) {
-        throw new Error("Dates de séjour invalides");
-      }
-      const nights = Math.ceil((e.getTime() - s.getTime()) / (1000 * 60 * 60 * 24));
-      propertyTotal = Number(property.price_per_night) * nights;
-      propertyCheckin = data.propertyDates.checkin;
-      propertyCheckout = data.propertyDates.checkout;
-      propertyId = property.id;
-      propertyGuests = data.propertyDates.guests;
+      data.propertyDates;
+
+    const [vehicleRes, propertyRes] = await Promise.all([
+      needVehicle && data.vehicleId
+        ? supabaseAdmin
+            .from("vehicles")
+            .select("id, price_per_day, is_active")
+            .eq("id", data.vehicleId)
+            .single()
+        : Promise.resolve({ data: null, error: null } as const),
+      needProperty && data.propertyId
+        ? supabaseAdmin
+            .from("properties")
+            .select("id, price_per_night, is_active, capacity")
+            .eq("id", data.propertyId)
+            .single()
+        : Promise.resolve({ data: null, error: null } as const),
+    ]);
+
+    if (needVehicle && (vehicleRes.error || !vehicleRes.data)) {
+      throw new Error("Véhicule indisponible");
+    }
+    if (needProperty && (propertyRes.error || !propertyRes.data)) {
+      throw new Error("Logement indisponible");
     }
 
-    if (vehicleTotal === 0 && propertyTotal === 0) {
-      throw new Error("Sélection vide");
-    }
+    const plan = computeBookingPlan(
+      data,
+      vehicleRes.data
+        ? {
+            id: vehicleRes.data.id,
+            price_per_day: Number(vehicleRes.data.price_per_day),
+            is_active: vehicleRes.data.is_active,
+          }
+        : null,
+      propertyRes.data
+        ? {
+            id: propertyRes.data.id,
+            price_per_night: Number(propertyRes.data.price_per_night),
+            is_active: propertyRes.data.is_active,
+            capacity: propertyRes.data.capacity,
+          }
+        : null,
+    );
 
     // Re-check availability one more time
     const conflictChecks = await Promise.all([
-      vehicleId && vehicleStart && vehicleEnd
+      plan.vehicleId && plan.vehicleStart && plan.vehicleEnd
         ? supabaseAdmin
             .from("bookings")
             .select("id", { count: "exact", head: true })
-            .eq("vehicle_id", vehicleId)
+            .eq("vehicle_id", plan.vehicleId)
             .or("payment_status.eq.paid,payment_status.eq.pending")
             .gt("expires_at", new Date().toISOString())
-            .lt("vehicle_start", vehicleEnd)
-            .gt("vehicle_end", vehicleStart)
+            .lt("vehicle_start", plan.vehicleEnd)
+            .gt("vehicle_end", plan.vehicleStart)
         : Promise.resolve({ count: 0, error: null } as const),
-      propertyId && propertyCheckin && propertyCheckout
+      plan.propertyId && plan.propertyCheckin && plan.propertyCheckout
         ? supabaseAdmin
             .from("bookings")
             .select("id", { count: "exact", head: true })
-            .eq("property_id", propertyId)
+            .eq("property_id", plan.propertyId)
             .or("payment_status.eq.paid,payment_status.eq.pending")
             .gt("expires_at", new Date().toISOString())
-            .lt("property_checkin", propertyCheckout)
-            .gt("property_checkout", propertyCheckin)
+            .lt("property_checkin", plan.propertyCheckout)
+            .gt("property_checkout", plan.propertyCheckin)
         : Promise.resolve({ count: 0, error: null } as const),
     ]);
     for (const c of conflictChecks) {
@@ -210,11 +190,6 @@ export const createBooking = createServerFn({ method: "POST" })
       }
     }
 
-    const totalAmount = vehicleTotal + propertyTotal;
-    const depositAmount = Math.round(totalAmount * DEPOSIT_RATIO * 100) / 100;
-    const amountCharged =
-      data.paymentMode === "full" ? totalAmount : depositAmount;
-
     const { data: booking, error: insertError } = await supabaseAdmin
       .from("bookings")
       .insert({
@@ -223,21 +198,21 @@ export const createBooking = createServerFn({ method: "POST" })
         customer_email: data.customer.email,
         customer_phone: data.customer.phone,
         flight_info: data.customer.flight ?? null,
-        vehicle_id: vehicleId,
+        vehicle_id: plan.vehicleId,
         pickup_location_id: data.vehicleDates?.pickupLocationId ?? null,
         dropoff_location_id: data.vehicleDates?.dropoffLocationId ?? null,
-        vehicle_start: vehicleStart,
-        vehicle_end: vehicleEnd,
-        vehicle_total: vehicleTotal,
-        property_id: propertyId,
-        property_checkin: propertyCheckin,
-        property_checkout: propertyCheckout,
-        property_guests: propertyGuests,
-        property_total: propertyTotal,
-        total_amount: totalAmount,
-        deposit_amount: depositAmount,
-        payment_mode: data.paymentMode,
-        amount_charged: amountCharged,
+        vehicle_start: plan.vehicleStart,
+        vehicle_end: plan.vehicleEnd,
+        vehicle_total: plan.vehicleTotal,
+        property_id: plan.propertyId,
+        property_checkin: plan.propertyCheckin,
+        property_checkout: plan.propertyCheckout,
+        property_guests: plan.propertyGuests,
+        property_total: plan.propertyTotal,
+        total_amount: plan.totalAmount,
+        deposit_amount: plan.depositAmount,
+        payment_mode: plan.paymentMode,
+        amount_charged: plan.amountCharged,
         payment_status: "pending",
         expires_at: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
       })
