@@ -135,6 +135,14 @@ function VehicleRow({
   const [price, setPrice] = useState(String(vehicle.price_per_day));
   const [description, setDescription] = useState(vehicle.description ?? "");
   const [status, setStatus] = useState<string | null>(null);
+  const [showHistory, setShowHistory] = useState(false);
+
+  const historyFn = useServerFn(adminVehicleHistory);
+  const { data: history, isFetching: loadingHistory, refetch } = useQuery({
+    queryKey: ["admin", "vehicle-history", vehicle.id],
+    queryFn: () => historyFn({ data: { vehicleId: vehicle.id } }),
+    enabled: showHistory,
+  });
 
   async function save() {
     setStatus(null);
@@ -145,6 +153,7 @@ function VehicleRow({
         description: description.trim() ? description.trim() : null,
       });
       setStatus("✓ Enregistré");
+      if (showHistory) refetch();
     } catch (e) {
       setStatus((e as Error).message);
     }
@@ -165,6 +174,41 @@ function VehicleRow({
         <Button onClick={save} disabled={saving}>Enregistrer</Button>
       </div>
       {status && <p className="text-xs mt-2 text-muted-foreground">{status}</p>}
+
+      <div className="mt-3 border-t pt-3">
+        <button
+          type="button"
+          className="text-xs text-muted-foreground hover:text-foreground underline"
+          onClick={() => setShowHistory((s) => !s)}
+        >
+          {showHistory ? "Masquer l'historique" : "Voir l'historique des modifications"}
+        </button>
+        {showHistory && (
+          <div className="mt-3 space-y-2">
+            {loadingHistory && <p className="text-xs text-muted-foreground">Chargement…</p>}
+            {!loadingHistory && history && history.length === 0 && (
+              <p className="text-xs text-muted-foreground">Aucune modification enregistrée.</p>
+            )}
+            {history?.map((h) => (
+              <div key={h.id} className="text-xs border rounded p-2">
+                <div className="flex justify-between text-muted-foreground">
+                  <span>
+                    <span className="font-medium text-foreground">{h.field === "price_per_day" ? "Prix" : "Description"}</span>
+                    {" · "}
+                    {h.changed_by_email ?? "admin"}
+                  </span>
+                  <span>{new Date(h.created_at).toLocaleString("fr-FR")}</span>
+                </div>
+                <div className="mt-1">
+                  <span className="line-through text-muted-foreground">{h.old_value ?? "—"}</span>
+                  {" → "}
+                  <span className="font-medium">{h.new_value ?? "—"}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </Card>
   );
 }
