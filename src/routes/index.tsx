@@ -500,6 +500,15 @@ function PropertyDatesStep() {
       onBack={() => dispatch({ type: "GO", step: backStep })}
     >
       <form onSubmit={submit} className="space-y-6">
+        {state.vehicle.startISO && state.vehicle.endISO && (
+          <SyncDatesButton
+            onClick={() => {
+              setCheckin(state.vehicle.startISO!.slice(0, 10));
+              setCheckout(state.vehicle.endISO!.slice(0, 10));
+            }}
+            label="Aligner sur les dates de la voiture"
+          />
+        )}
         <div className="grid sm:grid-cols-2 gap-4">
           <Field label="Arrivée">
             <input
