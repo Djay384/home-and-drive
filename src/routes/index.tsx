@@ -97,7 +97,7 @@ function IntentStep() {
             Routh Location · Guadeloupe
           </span>
           <h1 className="text-4xl md:text-5xl lg:text-6xl font-medium font-serif leading-tight text-balance text-neutral-900">
-            Bienvenue en Guadeloupe. Que recherchez-vous pour votre séjour ?
+            Bienvenue en Guadeloupe. Que recherchez-vous pour votre séjour dans l'île papillon ?
           </h1>
           <p className="text-lg text-neutral-600 text-pretty max-w-[48ch]">
             Sélectionnez l'option qui correspond à votre projet d'évasion dans l'archipel.
