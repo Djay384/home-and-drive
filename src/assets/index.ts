@@ -17,7 +17,7 @@ const IMAGE_MAP: Record<string, string> = {
   "vehicle-panda-auto": vehiclePandaAuto,
   "property-villa-anse": propertyVillaAnse,
   "property-bungalow": propertyBungalow,
-  "property-villa-creole": propertyVillaCreole,
+  "property-bungalow": propertyBungalow,
   "hero-guadeloupe": heroGuadeloupe,
 };
 
