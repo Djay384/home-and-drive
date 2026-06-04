@@ -7,7 +7,6 @@ import vehicle208Auto from "./vehicle-208-auto.jpg";
 import vehiclePandaAuto from "./vehicle-panda-auto.jpg";
 import propertyVillaAnse from "./property-villa-anse.jpg";
 import propertyBungalow from "./property-bungalow.jpg";
-import propertyVillaCreole from "./property-villa-creole.jpg";
 import heroGuadeloupe from "./hero-guadeloupe.jpg";
 
 const IMAGE_MAP: Record<string, string> = {
