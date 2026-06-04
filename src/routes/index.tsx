@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState, type FormEvent } from "react";
 import { AnimatePresence, motion } from "motion/react";
+import { Bath, BedDouble, DoorClosed } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { getCatalog, createBooking } from "@/lib/booking.functions";
@@ -615,20 +616,50 @@ function PropertyPickStep() {
                     />
                   </div>
 
+                  <div className="grid grid-cols-3 gap-3 md:gap-6 mt-8">
+                    {(() => {
+                      const desc = p.description ?? "";
+                      const parts = desc.split("·").map((s) => s.trim()).filter(Boolean);
+                      const pick = (kw: string) => parts.find((x) => x.toLowerCase().includes(kw));
+                      const items = [
+                        { label: pick("chambre") ?? `${p.bedrooms} chambre${p.bedrooms > 1 ? "s" : ""}`, icon: DoorClosed },
+                        { label: pick("lit") ?? `${p.capacity} lits`, icon: BedDouble },
+                        { label: pick("salle de bain") ?? "Salle de bain privée", icon: Bath },
+                      ];
+                      return items.map(({ label, icon: Icon }) => (
+                        <div
+                          key={label}
+                          className="flex flex-col items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-3 py-5 text-center"
+                        >
+                          <Icon className="size-5 text-brand" strokeWidth={1.5} />
+                          <span className="text-xs md:text-sm font-medium text-white/90 leading-snug">
+                            {label}
+                          </span>
+                        </div>
+                      ));
+                    })()}
+                  </div>
+
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-12 mt-12">
                     <div className="space-y-4">
                       <h4 className="text-xs uppercase tracking-widest text-brand font-semibold">
                         Équipements
                       </h4>
                       <ul className="space-y-3">
-                        {p.amenities?.slice(0, 6).map((a) => (
-                          <li key={a} className="flex items-center gap-3 text-sm text-neutral-300">
-                            <svg className="size-4 text-brand shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path d="M5 13l4 4L19 7" strokeWidth="2" />
-                            </svg>
-                            {a}
-                          </li>
-                        ))}
+                        {p.amenities
+                          ?.filter((a) => {
+                            const l = a.toLowerCase();
+                            return !l.includes("salle de bain") && !l.includes("lit");
+                          })
+                          .slice(0, 6)
+                          .map((a) => (
+                            <li key={a} className="flex items-center gap-3 text-sm text-neutral-300">
+                              <svg className="size-4 text-brand shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path d="M5 13l4 4L19 7" strokeWidth="2" />
+                              </svg>
+                              {a}
+                            </li>
+                          ))}
                       </ul>
                     </div>
                     <div className="md:col-span-2 space-y-6">
@@ -636,9 +667,7 @@ function PropertyPickStep() {
                         {p.description}
                       </p>
                       <div className="flex flex-wrap gap-3 text-xs uppercase tracking-widest text-white/60">
-                        <span>{p.bedrooms} chambres</span>
-                        <span>·</span>
-                        <span>{p.capacity} voyageurs max</span>
+                        <span>Jusqu'à {p.capacity} voyageurs</span>
                       </div>
                       <button
                         type="button"
