@@ -669,23 +669,48 @@ function PropertyPickStep() {
                       <div className="flex flex-wrap gap-3 text-xs uppercase tracking-widest text-white/60">
                         <span>Jusqu'à {p.capacity} voyageurs</span>
                       </div>
-                      <button
-                        type="button"
-                        disabled={!p.available}
-                        onClick={() => select(p.id, Number(p.price_per_night), p.name)}
-                        className={`inline-flex items-center py-3 pr-6 pl-2 text-sm font-medium rounded-full transition-transform ${
-                          p.available
-                            ? "bg-brand text-white hover:scale-[1.02]"
-                            : "bg-white/10 text-white/60 cursor-not-allowed"
-                        }`}
-                      >
-                        <span className="p-1.5 bg-white/20 rounded-full mr-3">
-                          <svg className="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path d="M12 4.5v15m7.5-7.5h-15" strokeWidth="2" />
-                          </svg>
-                        </span>
-                        {p.available ? "Sélectionner ce logement" : "Indisponible sur ces dates"}
-                      </button>
+
+                      <div className="rounded-2xl border border-white/10 bg-white/5 p-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                        <div className="space-y-1">
+                          <div className="flex items-baseline gap-2">
+                            <span className="text-3xl font-serif font-medium text-white">
+                              {p.price_per_night}€
+                            </span>
+                            <span className="text-xs uppercase tracking-widest text-white/60">
+                              / nuit
+                            </span>
+                          </div>
+                          <p className="text-sm text-white/70">
+                            {nights} nuit{nights > 1 ? "s" : ""} ·{" "}
+                            <span className="text-white font-medium">
+                              Total {Number(p.price_per_night) * nights}€
+                            </span>
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          disabled={!p.available}
+                          onClick={() => select(p.id, Number(p.price_per_night), p.name)}
+                          className={`inline-flex items-center justify-center py-3.5 px-6 text-sm font-semibold rounded-full transition-transform w-full sm:w-auto ${
+                            p.available
+                              ? "bg-brand text-white hover:scale-[1.02] shadow-lg shadow-brand/30"
+                              : "bg-white/10 text-white/60 cursor-not-allowed"
+                          }`}
+                        >
+                          {p.available ? (
+                            <>
+                              <span className="p-1.5 bg-white/20 rounded-full mr-3">
+                                <svg className="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path d="M12 4.5v15m7.5-7.5h-15" strokeWidth="2" />
+                                </svg>
+                              </span>
+                              Sélectionner ce logement
+                            </>
+                          ) : (
+                            "Indisponible sur ces dates"
+                          )}
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </article>
