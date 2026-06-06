@@ -811,8 +811,9 @@ function CustomerStep() {
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
-    if (!isValidLocal(dial, local)) {
-      setPhoneError(`Numéro de téléphone invalide. ${phoneExample}.`);
+    const err = validatePhone(dial, local);
+    if (err) {
+      setPhoneError(err);
       return;
     }
     const full = `${dial}${local}`;
@@ -821,6 +822,7 @@ function CustomerStep() {
     dispatch({ type: "SET_CUSTOMER", value: next });
     dispatch({ type: "GO", step: "recap" });
   };
+
 
   return (
     <StepShell
