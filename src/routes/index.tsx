@@ -745,17 +745,54 @@ function splitPhone(full: string): { dial: string; local: string } {
   return { dial: "+590", local: full.replace(/\D/g, "") };
 }
 
-function isValidLocal(dial: string, local: string): boolean {
-  if (!/^\d+$/.test(local)) return false;
-  // Generic E.164: local digits between 6 and 12
-  if (local.length < 6 || local.length > 12) return false;
-  if (dial === "+590") {
-    // GP mobile/fixe: 9 chiffres, commence par 590 ou 690/691
-    return local.length === 9;
+const PHONE_RULES: Record<string, { len: number; startsWith?: string[]; example: string }> = {
+  "+590": { len: 9, startsWith: ["590", "690", "691", "692", "693", "694"], example: "690 12 34 56" },
+  "+33": { len: 9, startsWith: ["6", "7", "1", "2", "3", "4", "5", "9"], example: "6 12 34 56 78" },
+  "+596": { len: 9, example: "696 12 34 56" },
+  "+594": { len: 9, example: "694 12 34 56" },
+};
+
+function validatePhone(dial: string, local: string): string | null {
+  if (!local) return "Veuillez saisir votre numéro de téléphone.";
+  if (!/^\d+$/.test(local)) return "Le numéro doit contenir uniquement des chiffres.";
+  const rule = PHONE_RULES[dial];
+  if (rule) {
+    if (local.length !== rule.len) {
+      return `Le numéro doit contenir exactement ${rule.len} chiffres (ex : ${rule.example}).`;
+    }
+    if (rule.startsWith && !rule.startsWith.some((p) => local.startsWith(p))) {
+      return `Le numéro doit commencer par ${rule.startsWith.join(", ")}.`;
+    }
+    return null;
   }
-  if (dial === "+33") return local.length === 9;
-  return true;
+  if (local.length < 6 || local.length > 12) {
+    return "Le numéro doit contenir entre 6 et 12 chiffres.";
+  }
+  return null;
 }
+
+function formatPhonePretty(full: string): string {
+  const { dial, local } = splitPhone(full);
+  if (!local) return full;
+  // Group digits in pairs from the right, first group may be 1-3 digits
+  const head = local.length % 2 === 1 ? local.slice(0, local.length === 9 ? 3 : 1) : local.slice(0, 2);
+  const rest = local.slice(head.length).match(/.{1,2}/g) ?? [];
+  return `${dial} ${[head, ...rest].join(" ")}`.trim();
+}
+
+function maskPhonePretty(full: string): string {
+  const { dial, local } = splitPhone(full);
+  if (local.length < 4) return `${dial} ${"•".repeat(local.length)}`;
+  const visibleStart = local.slice(0, 3);
+  const visibleEnd = local.slice(-2);
+  const maskedLen = Math.max(0, local.length - visibleStart.length - visibleEnd.length);
+  const masked = visibleStart + "•".repeat(maskedLen) + visibleEnd;
+  // re-group like formatPhonePretty
+  const head = masked.length % 2 === 1 ? masked.slice(0, masked.length === 9 ? 3 : 1) : masked.slice(0, 2);
+  const rest = masked.slice(head.length).match(/.{1,2}/g) ?? [];
+  return `${dial} ${[head, ...rest].join(" ")}`.trim();
+}
+
 
 function CustomerStep() {
   const { state, dispatch } = useBooking();
@@ -774,8 +811,9 @@ function CustomerStep() {
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
-    if (!isValidLocal(dial, local)) {
-      setPhoneError(`Numéro de téléphone invalide. ${phoneExample}.`);
+    const err = validatePhone(dial, local);
+    if (err) {
+      setPhoneError(err);
       return;
     }
     const full = `${dial}${local}`;
@@ -784,6 +822,7 @@ function CustomerStep() {
     dispatch({ type: "SET_CUSTOMER", value: next });
     dispatch({ type: "GO", step: "recap" });
   };
+
 
   return (
     <StepShell
@@ -965,8 +1004,12 @@ function RecapStep() {
           </div>
           <div>
             <p className="text-xs uppercase tracking-widest text-neutral-400 mb-1">Téléphone</p>
-            <p className="font-medium">{state.customer.phone}</p>
+            <p className="font-medium" title={formatPhonePretty(state.customer.phone)}>
+              {maskPhonePretty(state.customer.phone)}
+            </p>
+            <p className="text-xs text-neutral-400 mt-0.5">Quelques chiffres sont masqués pour votre sécurité.</p>
           </div>
+
         </div>
 
         <div className="space-y-3">
