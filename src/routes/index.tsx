@@ -727,13 +727,61 @@ function PropertyPickStep() {
    STEP 7 — Customer
    ======================================================================= */
 
+const DIAL_CODES = [
+  { code: "+590", label: "🇬🇵 Guadeloupe (+590)" },
+  { code: "+33", label: "🇫🇷 France (+33)" },
+  { code: "+596", label: "🇲🇶 Martinique (+596)" },
+  { code: "+594", label: "🇬🇫 Guyane (+594)" },
+  { code: "+1", label: "🇺🇸 USA / Canada (+1)" },
+  { code: "+44", label: "🇬🇧 Royaume-Uni (+44)" },
+  { code: "+49", label: "🇩🇪 Allemagne (+49)" },
+  { code: "+32", label: "🇧🇪 Belgique (+32)" },
+  { code: "+41", label: "🇨🇭 Suisse (+41)" },
+];
+
+function splitPhone(full: string): { dial: string; local: string } {
+  const match = DIAL_CODES.find((d) => full.startsWith(d.code));
+  if (match) return { dial: match.code, local: full.slice(match.code.length).replace(/\D/g, "") };
+  return { dial: "+590", local: full.replace(/\D/g, "") };
+}
+
+function isValidLocal(dial: string, local: string): boolean {
+  if (!/^\d+$/.test(local)) return false;
+  // Generic E.164: local digits between 6 and 12
+  if (local.length < 6 || local.length > 12) return false;
+  if (dial === "+590") {
+    // GP mobile/fixe: 9 chiffres, commence par 590 ou 690/691
+    return local.length === 9;
+  }
+  if (dial === "+33") return local.length === 9;
+  return true;
+}
+
 function CustomerStep() {
   const { state, dispatch } = useBooking();
+  const initial = splitPhone(state.customer.phone || "+590");
   const [form, setForm] = useState(state.customer);
+  const [dial, setDial] = useState(initial.dial);
+  const [local, setLocal] = useState(initial.local);
+  const [phoneError, setPhoneError] = useState<string | null>(null);
+
+  const phoneExample =
+    dial === "+590"
+      ? "Ex : 690123456 (9 chiffres)"
+      : dial === "+33"
+        ? "Ex : 612345678 (9 chiffres)"
+        : "6 à 12 chiffres";
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
-    dispatch({ type: "SET_CUSTOMER", value: form });
+    if (!isValidLocal(dial, local)) {
+      setPhoneError(`Numéro de téléphone invalide. ${phoneExample}.`);
+      return;
+    }
+    const full = `${dial}${local}`;
+    const next = { ...form, phone: full };
+    setForm(next);
+    dispatch({ type: "SET_CUSTOMER", value: next });
     dispatch({ type: "GO", step: "recap" });
   };
 
@@ -766,11 +814,44 @@ function CustomerStep() {
             />
           </Field>
           <Field label="Téléphone">
-            <input
-              required type="tel" maxLength={40} value={form.phone}
-              onChange={(e) => setForm({ ...form, phone: e.target.value.replace(/\D/g, "") })}
-              className="w-full px-4 py-3 rounded-xl bg-white ring-1 ring-black/5 focus:ring-brand focus:outline-none"
-            />
+            <div className="flex gap-2">
+              <select
+                value={dial}
+                onChange={(e) => {
+                  setDial(e.target.value);
+                  setPhoneError(null);
+                }}
+                aria-label="Indicatif pays"
+                className="px-3 py-3 rounded-xl bg-white ring-1 ring-black/5 focus:ring-brand focus:outline-none text-sm"
+              >
+                {DIAL_CODES.map((d) => (
+                  <option key={d.code} value={d.code}>{d.label}</option>
+                ))}
+              </select>
+              <input
+                required
+                type="tel"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                maxLength={12}
+                value={local}
+                placeholder="690123456"
+                aria-invalid={phoneError ? true : undefined}
+                aria-describedby="phone-help"
+                onChange={(e) => {
+                  setLocal(e.target.value.replace(/\D/g, ""));
+                  if (phoneError) setPhoneError(null);
+                }}
+                className={`flex-1 min-w-0 px-4 py-3 rounded-xl bg-white ring-1 focus:outline-none ${
+                  phoneError ? "ring-red-500 focus:ring-red-500" : "ring-black/5 focus:ring-brand"
+                }`}
+              />
+            </div>
+            {phoneError ? (
+              <p id="phone-help" className="mt-1 text-xs text-red-600">{phoneError}</p>
+            ) : (
+              <p id="phone-help" className="mt-1 text-xs text-neutral-500">{phoneExample}</p>
+            )}
           </Field>
         </div>
         {(state.bookingType === "vehicle" || state.bookingType === "both") && (
