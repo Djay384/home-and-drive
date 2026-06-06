@@ -1004,8 +1004,12 @@ function RecapStep() {
           </div>
           <div>
             <p className="text-xs uppercase tracking-widest text-neutral-400 mb-1">Téléphone</p>
-            <p className="font-medium">{state.customer.phone}</p>
+            <p className="font-medium" title={formatPhonePretty(state.customer.phone)}>
+              {maskPhonePretty(state.customer.phone)}
+            </p>
+            <p className="text-xs text-neutral-400 mt-0.5">Quelques chiffres sont masqués pour votre sécurité.</p>
           </div>
+
         </div>
 
         <div className="space-y-3">
