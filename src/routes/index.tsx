@@ -768,7 +768,7 @@ function CustomerStep() {
           <Field label="Téléphone">
             <input
               required type="tel" maxLength={40} value={form.phone}
-              onChange={(e) => setForm({ ...form, phone: e.target.value })}
+              onChange={(e) => setForm({ ...form, phone: e.target.value.replace(/\D/g, "") })}
               className="w-full px-4 py-3 rounded-xl bg-white ring-1 ring-black/5 focus:ring-brand focus:outline-none"
             />
           </Field>
