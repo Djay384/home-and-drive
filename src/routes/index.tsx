@@ -829,11 +829,38 @@ function CustomerStep() {
     ? `Ex : ${rule.example} — ${lenLabel(rule.len)} chiffres, préfixes autorisés : ${rule.startsWith.join(", ")}.`
     : "6 à 12 chiffres";
 
-  const focusPhone = () => {
-    setPhoneError(null);
-    setLocal("");
-    requestAnimationFrame(() => phoneInputRef.current?.focus());
+  // Live re-validation: any time dial or local changes, re-run rules.
+  // Only show the error after the user has typed something, to avoid yelling on empty load.
+  useEffect(() => {
+    if (!local) {
+      setPhoneError(null);
+      return;
+    }
+    setPhoneError(validatePhone(dial, local));
+  }, [dial, local]);
+
+  // Quick-fix mode: pre-fill the local field with the expected format template
+  // (digits from the country example) so the user just has to overwrite each digit.
+  const applyQuickFix = () => {
+    const template = rule ? rule.example.replace(/\D/g, "") : "";
+    setLocal(template);
+    requestAnimationFrame(() => {
+      const input = phoneInputRef.current;
+      if (!input) return;
+      input.focus();
+      input.select();
+    });
   };
+
+  // Auto-trigger quick-fix when arriving on this step from the recap with an invalid number.
+  useEffect(() => {
+    if (validatePhone(dial, local) !== null) {
+      applyQuickFix();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const phoneInvalid = validatePhone(dial, local) !== null;
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
@@ -885,7 +912,7 @@ function CustomerStep() {
                 value={dial}
                 onChange={(e) => {
                   setDial(e.target.value);
-                  setPhoneError(null);
+                  // live re-validation effect will recompute the error
                 }}
                 aria-label="Indicatif pays"
                 className="px-3 py-3 rounded-xl bg-white ring-1 ring-black/5 focus:ring-brand focus:outline-none text-sm"
@@ -919,7 +946,7 @@ function CustomerStep() {
                 <p className="text-xs text-red-600 flex-1 min-w-0">{phoneError}</p>
                 <button
                   type="button"
-                  onClick={focusPhone}
+                  onClick={applyQuickFix}
                   className="text-xs font-medium text-brand underline underline-offset-2 hover:text-accent shrink-0"
                 >
                   Modifier mon numéro
@@ -939,7 +966,7 @@ function CustomerStep() {
             />
           </Field>
         )}
-        <PrimaryButton>Récapitulatif</PrimaryButton>
+        <PrimaryButton disabled={phoneInvalid}>Récapitulatif</PrimaryButton>
       </form>
     </StepShell>
   );
