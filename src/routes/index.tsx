@@ -912,7 +912,7 @@ function CustomerStep() {
                 value={dial}
                 onChange={(e) => {
                   setDial(e.target.value);
-                  setPhoneError(null);
+                  // live re-validation effect will recompute the error
                 }}
                 aria-label="Indicatif pays"
                 className="px-3 py-3 rounded-xl bg-white ring-1 ring-black/5 focus:ring-brand focus:outline-none text-sm"
