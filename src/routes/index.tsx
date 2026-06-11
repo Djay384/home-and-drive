@@ -946,7 +946,7 @@ function CustomerStep() {
                 <p className="text-xs text-red-600 flex-1 min-w-0">{phoneError}</p>
                 <button
                   type="button"
-                  onClick={focusPhone}
+                  onClick={applyQuickFix}
                   className="text-xs font-medium text-brand underline underline-offset-2 hover:text-accent shrink-0"
                 >
                   Modifier mon numéro
