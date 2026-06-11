@@ -745,28 +745,49 @@ function splitPhone(full: string): { dial: string; local: string } {
   return { dial: "+590", local: full.replace(/\D/g, "") };
 }
 
-const PHONE_RULES: Record<string, { len: number; startsWith?: string[]; example: string }> = {
-  "+590": { len: 9, startsWith: ["590", "690", "691", "692", "693", "694"], example: "690 12 34 56" },
-  "+33": { len: 9, startsWith: ["6", "7", "1", "2", "3", "4", "5", "9"], example: "6 12 34 56 78" },
-  "+596": { len: 9, example: "696 12 34 56" },
-  "+594": { len: 9, example: "694 12 34 56" },
+const PHONE_RULES: Record<
+  string,
+  { len: number | number[]; startsWith: string[]; example: string; country: string }
+> = {
+  "+590": {
+    len: 9,
+    startsWith: ["590", "690", "691", "692", "693", "694"],
+    example: "690 12 34 56",
+    country: "Guadeloupe",
+  },
+  "+33": {
+    len: 9,
+    startsWith: ["1", "2", "3", "4", "5", "6", "7", "9"],
+    example: "6 12 34 56 78",
+    country: "France",
+  },
+  "+596": { len: 9, startsWith: ["596", "696", "697"], example: "696 12 34 56", country: "Martinique" },
+  "+594": { len: 9, startsWith: ["594", "694"], example: "694 12 34 56", country: "Guyane" },
+  "+1": { len: 10, startsWith: ["2", "3", "4", "5", "6", "7", "8", "9"], example: "415 555 0132", country: "USA / Canada" },
+  "+44": { len: [10, 11], startsWith: ["7", "1", "2", "3"], example: "7400 123456", country: "Royaume-Uni" },
+  "+49": { len: [10, 11], startsWith: ["15", "16", "17", "30", "40", "89"], example: "151 23456789", country: "Allemagne" },
+  "+32": { len: 9, startsWith: ["4", "2", "3", "9"], example: "470 12 34 56", country: "Belgique" },
+  "+41": { len: 9, startsWith: ["7", "2", "3", "4", "5", "6", "8"], example: "76 123 45 67", country: "Suisse" },
 };
+
+function lenLabel(len: number | number[]): string {
+  return Array.isArray(len) ? `${len.join(" ou ")}` : `${len}`;
+}
 
 function validatePhone(dial: string, local: string): string | null {
   if (!local) return "Veuillez saisir votre numéro de téléphone.";
-  if (!/^\d+$/.test(local)) return "Le numéro doit contenir uniquement des chiffres.";
+  if (!/^\d+$/.test(local)) return "Le numéro doit contenir uniquement des chiffres (0-9), sans espaces ni tirets.";
   const rule = PHONE_RULES[dial];
-  if (rule) {
-    if (local.length !== rule.len) {
-      return `Le numéro doit contenir exactement ${rule.len} chiffres (ex : ${rule.example}).`;
-    }
-    if (rule.startsWith && !rule.startsWith.some((p) => local.startsWith(p))) {
-      return `Le numéro doit commencer par ${rule.startsWith.join(", ")}.`;
-    }
+  if (!rule) {
+    if (local.length < 6 || local.length > 12) return "Le numéro doit contenir entre 6 et 12 chiffres.";
     return null;
   }
-  if (local.length < 6 || local.length > 12) {
-    return "Le numéro doit contenir entre 6 et 12 chiffres.";
+  const lens = Array.isArray(rule.len) ? rule.len : [rule.len];
+  if (!lens.includes(local.length)) {
+    return `Numéro ${rule.country} invalide : ${lenLabel(rule.len)} chiffres attendus après ${dial} (vous en avez saisi ${local.length}). Exemple : ${rule.example}.`;
+  }
+  if (!rule.startsWith.some((p) => local.startsWith(p))) {
+    return `Préfixe non reconnu pour ${rule.country}. Préfixes autorisés : ${rule.startsWith.join(", ")}. Exemple : ${rule.example}.`;
   }
   return null;
 }
