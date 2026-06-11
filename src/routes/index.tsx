@@ -822,19 +822,25 @@ function CustomerStep() {
   const [dial, setDial] = useState(initial.dial);
   const [local, setLocal] = useState(initial.local);
   const [phoneError, setPhoneError] = useState<string | null>(null);
+  const phoneInputRef = useRef<HTMLInputElement>(null);
 
-  const phoneExample =
-    dial === "+590"
-      ? "Ex : 690123456 (9 chiffres)"
-      : dial === "+33"
-        ? "Ex : 612345678 (9 chiffres)"
-        : "6 à 12 chiffres";
+  const rule = PHONE_RULES[dial];
+  const phoneExample = rule
+    ? `Ex : ${rule.example} — ${lenLabel(rule.len)} chiffres, préfixes autorisés : ${rule.startsWith.join(", ")}.`
+    : "6 à 12 chiffres";
+
+  const focusPhone = () => {
+    setPhoneError(null);
+    setLocal("");
+    requestAnimationFrame(() => phoneInputRef.current?.focus());
+  };
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
     const err = validatePhone(dial, local);
     if (err) {
       setPhoneError(err);
+      phoneInputRef.current?.focus();
       return;
     }
     const full = `${dial}${local}`;
