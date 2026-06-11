@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { Bath, BedDouble, DoorClosed } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
@@ -745,28 +745,49 @@ function splitPhone(full: string): { dial: string; local: string } {
   return { dial: "+590", local: full.replace(/\D/g, "") };
 }
 
-const PHONE_RULES: Record<string, { len: number; startsWith?: string[]; example: string }> = {
-  "+590": { len: 9, startsWith: ["590", "690", "691", "692", "693", "694"], example: "690 12 34 56" },
-  "+33": { len: 9, startsWith: ["6", "7", "1", "2", "3", "4", "5", "9"], example: "6 12 34 56 78" },
-  "+596": { len: 9, example: "696 12 34 56" },
-  "+594": { len: 9, example: "694 12 34 56" },
+const PHONE_RULES: Record<
+  string,
+  { len: number | number[]; startsWith: string[]; example: string; country: string }
+> = {
+  "+590": {
+    len: 9,
+    startsWith: ["590", "690", "691", "692", "693", "694"],
+    example: "690 12 34 56",
+    country: "Guadeloupe",
+  },
+  "+33": {
+    len: 9,
+    startsWith: ["1", "2", "3", "4", "5", "6", "7", "9"],
+    example: "6 12 34 56 78",
+    country: "France",
+  },
+  "+596": { len: 9, startsWith: ["596", "696", "697"], example: "696 12 34 56", country: "Martinique" },
+  "+594": { len: 9, startsWith: ["594", "694"], example: "694 12 34 56", country: "Guyane" },
+  "+1": { len: 10, startsWith: ["2", "3", "4", "5", "6", "7", "8", "9"], example: "415 555 0132", country: "USA / Canada" },
+  "+44": { len: [10, 11], startsWith: ["7", "1", "2", "3"], example: "7400 123456", country: "Royaume-Uni" },
+  "+49": { len: [10, 11], startsWith: ["15", "16", "17", "30", "40", "89"], example: "151 23456789", country: "Allemagne" },
+  "+32": { len: 9, startsWith: ["4", "2", "3", "9"], example: "470 12 34 56", country: "Belgique" },
+  "+41": { len: 9, startsWith: ["7", "2", "3", "4", "5", "6", "8"], example: "76 123 45 67", country: "Suisse" },
 };
+
+function lenLabel(len: number | number[]): string {
+  return Array.isArray(len) ? `${len.join(" ou ")}` : `${len}`;
+}
 
 function validatePhone(dial: string, local: string): string | null {
   if (!local) return "Veuillez saisir votre numéro de téléphone.";
-  if (!/^\d+$/.test(local)) return "Le numéro doit contenir uniquement des chiffres.";
+  if (!/^\d+$/.test(local)) return "Le numéro doit contenir uniquement des chiffres (0-9), sans espaces ni tirets.";
   const rule = PHONE_RULES[dial];
-  if (rule) {
-    if (local.length !== rule.len) {
-      return `Le numéro doit contenir exactement ${rule.len} chiffres (ex : ${rule.example}).`;
-    }
-    if (rule.startsWith && !rule.startsWith.some((p) => local.startsWith(p))) {
-      return `Le numéro doit commencer par ${rule.startsWith.join(", ")}.`;
-    }
+  if (!rule) {
+    if (local.length < 6 || local.length > 12) return "Le numéro doit contenir entre 6 et 12 chiffres.";
     return null;
   }
-  if (local.length < 6 || local.length > 12) {
-    return "Le numéro doit contenir entre 6 et 12 chiffres.";
+  const lens = Array.isArray(rule.len) ? rule.len : [rule.len];
+  if (!lens.includes(local.length)) {
+    return `Numéro ${rule.country} invalide : ${lenLabel(rule.len)} chiffres attendus après ${dial} (vous en avez saisi ${local.length}). Exemple : ${rule.example}.`;
+  }
+  if (!rule.startsWith.some((p) => local.startsWith(p))) {
+    return `Préfixe non reconnu pour ${rule.country}. Préfixes autorisés : ${rule.startsWith.join(", ")}. Exemple : ${rule.example}.`;
   }
   return null;
 }
@@ -801,19 +822,25 @@ function CustomerStep() {
   const [dial, setDial] = useState(initial.dial);
   const [local, setLocal] = useState(initial.local);
   const [phoneError, setPhoneError] = useState<string | null>(null);
+  const phoneInputRef = useRef<HTMLInputElement>(null);
 
-  const phoneExample =
-    dial === "+590"
-      ? "Ex : 690123456 (9 chiffres)"
-      : dial === "+33"
-        ? "Ex : 612345678 (9 chiffres)"
-        : "6 à 12 chiffres";
+  const rule = PHONE_RULES[dial];
+  const phoneExample = rule
+    ? `Ex : ${rule.example} — ${lenLabel(rule.len)} chiffres, préfixes autorisés : ${rule.startsWith.join(", ")}.`
+    : "6 à 12 chiffres";
+
+  const focusPhone = () => {
+    setPhoneError(null);
+    setLocal("");
+    requestAnimationFrame(() => phoneInputRef.current?.focus());
+  };
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
     const err = validatePhone(dial, local);
     if (err) {
       setPhoneError(err);
+      phoneInputRef.current?.focus();
       return;
     }
     const full = `${dial}${local}`;
@@ -868,6 +895,7 @@ function CustomerStep() {
                 ))}
               </select>
               <input
+                ref={phoneInputRef}
                 required
                 type="tel"
                 inputMode="numeric"
@@ -887,7 +915,16 @@ function CustomerStep() {
               />
             </div>
             {phoneError ? (
-              <p id="phone-help" className="mt-1 text-xs text-red-600">{phoneError}</p>
+              <div id="phone-help" className="mt-1.5 flex flex-wrap items-start justify-between gap-2">
+                <p className="text-xs text-red-600 flex-1 min-w-0">{phoneError}</p>
+                <button
+                  type="button"
+                  onClick={focusPhone}
+                  className="text-xs font-medium text-brand underline underline-offset-2 hover:text-accent shrink-0"
+                >
+                  Modifier mon numéro
+                </button>
+              </div>
             ) : (
               <p id="phone-help" className="mt-1 text-xs text-neutral-500">{phoneExample}</p>
             )}
@@ -1004,10 +1041,39 @@ function RecapStep() {
           </div>
           <div>
             <p className="text-xs uppercase tracking-widest text-neutral-400 mb-1">Téléphone</p>
-            <p className="font-medium" title={formatPhonePretty(state.customer.phone)}>
-              {maskPhonePretty(state.customer.phone)}
-            </p>
-            <p className="text-xs text-neutral-400 mt-0.5">Quelques chiffres sont masqués pour votre sécurité.</p>
+            {(() => {
+              const { dial, local } = splitPhone(state.customer.phone);
+              const phoneErr = validatePhone(dial, local);
+              if (phoneErr) {
+                return (
+                  <div className="rounded-lg bg-red-50 ring-1 ring-red-200 p-3">
+                    <p className="text-xs text-red-700">{phoneErr}</p>
+                    <button
+                      type="button"
+                      onClick={() => dispatch({ type: "GO", step: "customer" })}
+                      className="mt-2 text-xs font-medium text-red-700 underline underline-offset-2 hover:text-red-900"
+                    >
+                      Modifier mon numéro
+                    </button>
+                  </div>
+                );
+              }
+              return (
+                <>
+                  <p className="font-medium" title={formatPhonePretty(state.customer.phone)}>
+                    {maskPhonePretty(state.customer.phone)}
+                  </p>
+                  <p className="text-xs text-neutral-400 mt-0.5">Quelques chiffres sont masqués pour votre sécurité.</p>
+                  <button
+                    type="button"
+                    onClick={() => dispatch({ type: "GO", step: "customer" })}
+                    className="mt-1 text-xs font-medium text-brand underline underline-offset-2 hover:text-accent"
+                  >
+                    Modifier
+                  </button>
+                </>
+              );
+            })()}
           </div>
 
         </div>
@@ -1059,14 +1125,36 @@ function RecapStep() {
 
       {error && <p className="mt-4 text-sm text-destructive">{error}</p>}
 
-      <div className="mt-8 space-y-3">
-        <button
-          onClick={confirm}
-          disabled={loading}
-          className="w-full py-4 bg-accent text-white rounded-full font-medium hover:bg-accent/90 transition-colors disabled:opacity-50"
-        >
-          {loading ? "Confirmation en cours…" : `Confirmer ma réservation · ${charged}€`}
-        </button>
+      {(() => {
+        const { dial, local } = splitPhone(state.customer.phone);
+        const phoneInvalid = !!validatePhone(dial, local);
+        return (
+          <div className="mt-8 space-y-3">
+            <button
+              onClick={confirm}
+              disabled={loading || phoneInvalid}
+              title={phoneInvalid ? "Corrigez votre numéro de téléphone avant de confirmer." : undefined}
+              className="w-full py-4 bg-accent text-white rounded-full font-medium hover:bg-accent/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {loading
+                ? "Confirmation en cours…"
+                : phoneInvalid
+                  ? "Téléphone invalide — corrigez pour continuer"
+                  : `Confirmer ma réservation · ${charged}€`}
+            </button>
+            {phoneInvalid && (
+              <button
+                type="button"
+                onClick={() => dispatch({ type: "GO", step: "customer" })}
+                className="w-full text-sm font-medium text-brand underline underline-offset-2 hover:text-accent"
+              >
+                Modifier mon numéro de téléphone
+              </button>
+            )}
+          </div>
+        );
+      })()}
+      <div className="mt-3">
         <p className="text-[11px] text-center text-neutral-400 max-w-[48ch] mx-auto">
           Votre réservation sera confirmée. Le paiement sécurisé en ligne sera activé prochainement —
           en attendant nous vous contacterons par email pour finaliser le règlement.
