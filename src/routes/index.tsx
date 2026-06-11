@@ -1041,10 +1041,39 @@ function RecapStep() {
           </div>
           <div>
             <p className="text-xs uppercase tracking-widest text-neutral-400 mb-1">Téléphone</p>
-            <p className="font-medium" title={formatPhonePretty(state.customer.phone)}>
-              {maskPhonePretty(state.customer.phone)}
-            </p>
-            <p className="text-xs text-neutral-400 mt-0.5">Quelques chiffres sont masqués pour votre sécurité.</p>
+            {(() => {
+              const { dial, local } = splitPhone(state.customer.phone);
+              const phoneErr = validatePhone(dial, local);
+              if (phoneErr) {
+                return (
+                  <div className="rounded-lg bg-red-50 ring-1 ring-red-200 p-3">
+                    <p className="text-xs text-red-700">{phoneErr}</p>
+                    <button
+                      type="button"
+                      onClick={() => dispatch({ type: "GO", step: "customer" })}
+                      className="mt-2 text-xs font-medium text-red-700 underline underline-offset-2 hover:text-red-900"
+                    >
+                      Modifier mon numéro
+                    </button>
+                  </div>
+                );
+              }
+              return (
+                <>
+                  <p className="font-medium" title={formatPhonePretty(state.customer.phone)}>
+                    {maskPhonePretty(state.customer.phone)}
+                  </p>
+                  <p className="text-xs text-neutral-400 mt-0.5">Quelques chiffres sont masqués pour votre sécurité.</p>
+                  <button
+                    type="button"
+                    onClick={() => dispatch({ type: "GO", step: "customer" })}
+                    className="mt-1 text-xs font-medium text-brand underline underline-offset-2 hover:text-accent"
+                  >
+                    Modifier
+                  </button>
+                </>
+              );
+            })()}
           </div>
 
         </div>
