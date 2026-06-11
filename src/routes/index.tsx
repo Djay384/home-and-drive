@@ -895,6 +895,7 @@ function CustomerStep() {
                 ))}
               </select>
               <input
+                ref={phoneInputRef}
                 required
                 type="tel"
                 inputMode="numeric"
@@ -914,7 +915,16 @@ function CustomerStep() {
               />
             </div>
             {phoneError ? (
-              <p id="phone-help" className="mt-1 text-xs text-red-600">{phoneError}</p>
+              <div id="phone-help" className="mt-1.5 flex flex-wrap items-start justify-between gap-2">
+                <p className="text-xs text-red-600 flex-1 min-w-0">{phoneError}</p>
+                <button
+                  type="button"
+                  onClick={focusPhone}
+                  className="text-xs font-medium text-brand underline underline-offset-2 hover:text-accent shrink-0"
+                >
+                  Modifier mon numéro
+                </button>
+              </div>
             ) : (
               <p id="phone-help" className="mt-1 text-xs text-neutral-500">{phoneExample}</p>
             )}
