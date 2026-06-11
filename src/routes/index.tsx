@@ -1125,14 +1125,36 @@ function RecapStep() {
 
       {error && <p className="mt-4 text-sm text-destructive">{error}</p>}
 
-      <div className="mt-8 space-y-3">
-        <button
-          onClick={confirm}
-          disabled={loading}
-          className="w-full py-4 bg-accent text-white rounded-full font-medium hover:bg-accent/90 transition-colors disabled:opacity-50"
-        >
-          {loading ? "Confirmation en cours…" : `Confirmer ma réservation · ${charged}€`}
-        </button>
+      {(() => {
+        const { dial, local } = splitPhone(state.customer.phone);
+        const phoneInvalid = !!validatePhone(dial, local);
+        return (
+          <div className="mt-8 space-y-3">
+            <button
+              onClick={confirm}
+              disabled={loading || phoneInvalid}
+              title={phoneInvalid ? "Corrigez votre numéro de téléphone avant de confirmer." : undefined}
+              className="w-full py-4 bg-accent text-white rounded-full font-medium hover:bg-accent/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {loading
+                ? "Confirmation en cours…"
+                : phoneInvalid
+                  ? "Téléphone invalide — corrigez pour continuer"
+                  : `Confirmer ma réservation · ${charged}€`}
+            </button>
+            {phoneInvalid && (
+              <button
+                type="button"
+                onClick={() => dispatch({ type: "GO", step: "customer" })}
+                className="w-full text-sm font-medium text-brand underline underline-offset-2 hover:text-accent"
+              >
+                Modifier mon numéro de téléphone
+              </button>
+            )}
+          </div>
+        );
+      })()}
+      <div className="mt-3">
         <p className="text-[11px] text-center text-neutral-400 max-w-[48ch] mx-auto">
           Votre réservation sera confirmée. Le paiement sécurisé en ligne sera activé prochainement —
           en attendant nous vous contacterons par email pour finaliser le règlement.
