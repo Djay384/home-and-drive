@@ -966,7 +966,7 @@ function CustomerStep() {
             />
           </Field>
         )}
-        <PrimaryButton>Récapitulatif</PrimaryButton>
+        <PrimaryButton disabled={phoneInvalid}>Récapitulatif</PrimaryButton>
       </form>
     </StepShell>
   );
