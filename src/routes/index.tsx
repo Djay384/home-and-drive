@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { Bath, BedDouble, DoorClosed } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
+import { toast } from "sonner";
 import { getCatalog, createBooking } from "@/lib/booking.functions";
 import { resolveImage, heroGuadeloupe } from "@/assets";
 import {
@@ -305,6 +306,7 @@ function VehicleDatesStep() {
     const en = new Date(end);
     if (en.getTime() <= s.getTime()) {
       setErr("La date de retour doit être après la date de départ.");
+      toast.error("Dates invalides", { description: "La date de retour doit être après la date de départ." });
       return;
     }
     dispatch({
@@ -388,6 +390,7 @@ function VehiclePickStep() {
 
   const select = (id: string, pricePerDay: number, name: string) => {
     dispatch({ type: "PICK_VEHICLE", id, pricePerDay, name });
+    toast.success("Véhicule sélectionné", { description: name });
     const next = state.bookingType === "both" ? "property-dates" : "customer";
     dispatch({ type: "GO", step: next });
   };
@@ -485,6 +488,7 @@ function PropertyDatesStep() {
     if (!checkin || !checkout) return;
     if (checkout <= checkin) {
       setErr("La date de départ doit être après l'arrivée.");
+      toast.error("Dates invalides", { description: "La date de départ doit être après l'arrivée." });
       return;
     }
     dispatch({ type: "SET_PROPERTY_DATES", checkin, checkout, guests });
@@ -557,6 +561,7 @@ function PropertyPickStep() {
 
   const select = (id: string, pricePerNight: number, name: string) => {
     dispatch({ type: "PICK_PROPERTY", id, pricePerNight, name });
+    toast.success("Logement sélectionné", { description: name });
     dispatch({ type: "GO", step: "customer" });
   };
 
@@ -876,6 +881,7 @@ function CustomerStep() {
     const err = validatePhone(dial, local);
     if (err) {
       setPhoneError(err);
+      toast.error("Numéro de téléphone invalide", { description: err });
       phoneInputRef.current?.focus();
       return;
     }
@@ -1021,6 +1027,7 @@ function RecapStep() {
   const confirm = async () => {
     setLoading(true);
     setError(null);
+    const loadingId = toast.loading("Confirmation de votre réservation…");
     try {
       const res = await createFn({
         data: {
@@ -1054,8 +1061,14 @@ function RecapStep() {
         },
       });
       dispatch({ type: "SET_BOOKING_REF", value: res.reference });
+      toast.success("Réservation confirmée !", {
+        id: loadingId,
+        description: `Référence : ${res.reference}`,
+      });
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Erreur inconnue");
+      const msg = e instanceof Error ? e.message : "Erreur inconnue";
+      setError(msg);
+      toast.error("Échec de la réservation", { id: loadingId, description: msg });
     } finally {
       setLoading(false);
     }
