@@ -881,6 +881,7 @@ function CustomerStep() {
     const err = validatePhone(dial, local);
     if (err) {
       setPhoneError(err);
+      toast.error("Numéro de téléphone invalide", { description: err });
       phoneInputRef.current?.focus();
       return;
     }
