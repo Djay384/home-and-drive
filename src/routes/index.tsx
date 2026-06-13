@@ -306,6 +306,7 @@ function VehicleDatesStep() {
     const en = new Date(end);
     if (en.getTime() <= s.getTime()) {
       setErr("La date de retour doit être après la date de départ.");
+      toast.error("Dates invalides", { description: "La date de retour doit être après la date de départ." });
       return;
     }
     dispatch({
