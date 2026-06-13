@@ -666,7 +666,7 @@ function PropertyPickStep() {
                               <svg className="size-4 text-brand shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path d="M5 13l4 4L19 7" strokeWidth="2" />
                               </svg>
-                              {a}
+                              {a === "Jardin tropical" ? "Jardin tropical\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n" : a}
                             </li>
                           ))}
                       </ul>
