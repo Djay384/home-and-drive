@@ -7,6 +7,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { getCatalog, createBooking } from "@/lib/booking.functions";
 import { resolveImage, heroGuadeloupe } from "@/assets";
+import routhLogo from "@/assets/routh-logo.asset.json";
 import {
   BookingProvider,
   useBooking,
