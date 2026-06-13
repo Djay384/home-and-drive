@@ -488,6 +488,7 @@ function PropertyDatesStep() {
     if (!checkin || !checkout) return;
     if (checkout <= checkin) {
       setErr("La date de départ doit être après l'arrivée.");
+      toast.error("Dates invalides", { description: "La date de départ doit être après l'arrivée." });
       return;
     }
     dispatch({ type: "SET_PROPERTY_DATES", checkin, checkout, guests });
