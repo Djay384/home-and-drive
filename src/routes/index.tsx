@@ -425,7 +425,7 @@ function VehiclePickStep() {
                 <div className="flex justify-between items-start gap-3">
                   <div>
                     <p className="text-xs uppercase tracking-widest text-neutral-400">{v.category}</p>
-                    <h3 className="text-lg font-medium">{v.name}</h3>
+                    <h3 className="text-lg font-medium">{v.name === "Nouvelle Peugeot 208 manuelle" ? "Nouvelle Peugeot 208 active" : v.name}</h3>
                   </div>
                   <span className="text-brand font-medium whitespace-nowrap">
                     {v.price_per_day}€<span className="text-xs text-neutral-400">/jour</span>
