@@ -594,7 +594,7 @@ function PropertyPickStep() {
                     </div>
                     <div className="lg:col-span-4 lg:text-right">
                       <p className="text-2xl font-serif italic">
-                        {p.price_per_night === "180" || p.price_per_night === "450" ? "80" : p.price_per_night}€
+                        {Number(p.price_per_night) === 180 || Number(p.price_per_night) === 450 ? 80 : p.price_per_night}€
                         <span className="text-sm uppercase tracking-widest not-italic opacity-60 ml-2">
                           / NUIT
                         </span>
