@@ -389,6 +389,7 @@ function VehiclePickStep() {
 
   const select = (id: string, pricePerDay: number, name: string) => {
     dispatch({ type: "PICK_VEHICLE", id, pricePerDay, name });
+    toast.success("Véhicule sélectionné", { description: name });
     const next = state.bookingType === "both" ? "property-dates" : "customer";
     dispatch({ type: "GO", step: next });
   };
