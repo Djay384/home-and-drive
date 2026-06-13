@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { Bath, BedDouble, DoorClosed } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
+import { toast } from "sonner";
 import { getCatalog, createBooking } from "@/lib/booking.functions";
 import { resolveImage, heroGuadeloupe } from "@/assets";
 import {
