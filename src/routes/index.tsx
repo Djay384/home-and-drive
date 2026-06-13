@@ -622,9 +622,18 @@ function PropertyPickStep() {
                       const parts = desc.split("·").map((s) => s.trim()).filter(Boolean);
                       const pick = (kw: string) => parts.find((x) => x.toLowerCase().includes(kw));
                       const items = [
-                        { label: pick("chambre") ?? `${p.bedrooms} chambre${p.bedrooms > 1 ? "s" : ""}`, icon: DoorClosed },
-                        { label: pick("lit") ?? `${p.capacity} lits`, icon: BedDouble },
-                        { label: pick("salle de bain") ?? "Salle de bain privée", icon: Bath },
+                        { 
+                          label: (pick("chambre") ?? `${p.bedrooms} chambre${p.bedrooms > 1 ? "s" : ""}`).replace("1 chambre · 2 lits · 1 salle de bain privée", "1 chambre · 2 lits · 1 salle de bain\u00a0"), 
+                          icon: DoorClosed 
+                        },
+                        { 
+                          label: (pick("lit") ?? `${p.capacity} lits`).replace("2 lits", "\u00a02 lits"), 
+                          icon: BedDouble 
+                        },
+                        { 
+                          label: (pick("salle de bain") ?? "Salle de bain privée").replace("1 salle de bain privée", "1 salle de bain\u00a0"), 
+                          icon: Bath 
+                        },
                       ];
                       return items.map(({ label, icon: Icon }) => (
                         <div
