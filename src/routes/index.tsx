@@ -1027,6 +1027,7 @@ function RecapStep() {
   const confirm = async () => {
     setLoading(true);
     setError(null);
+    const loadingId = toast.loading("Confirmation de votre réservation…");
     try {
       const res = await createFn({
         data: {
@@ -1060,8 +1061,14 @@ function RecapStep() {
         },
       });
       dispatch({ type: "SET_BOOKING_REF", value: res.reference });
+      toast.success("Réservation confirmée !", {
+        id: loadingId,
+        description: `Référence : ${res.reference}`,
+      });
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Erreur inconnue");
+      const msg = e instanceof Error ? e.message : "Erreur inconnue";
+      setError(msg);
+      toast.error("Échec de la réservation", { id: loadingId, description: msg });
     } finally {
       setLoading(false);
     }
