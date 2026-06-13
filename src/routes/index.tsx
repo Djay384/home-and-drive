@@ -95,6 +95,13 @@ function IntentStep() {
       <div className="absolute inset-0 -z-10 bg-gradient-to-b from-surface via-surface/70 to-surface" />
       <div className="max-w-screen-xl mx-auto w-full">
         <div className="max-w-[44ch] space-y-6">
+          <img
+            src={routhLogo.url}
+            alt="Routh Location"
+            width={240}
+            height={200}
+            className="w-40 sm:w-52 h-auto -ml-2 mb-2 drop-shadow-xl"
+          />
           <span className="text-xs uppercase tracking-[0.3em] text-brand font-medium">
             Routh Location · Guadeloupe
           </span>
