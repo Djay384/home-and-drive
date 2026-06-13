@@ -559,6 +559,7 @@ function PropertyPickStep() {
 
   const select = (id: string, pricePerNight: number, name: string) => {
     dispatch({ type: "PICK_PROPERTY", id, pricePerNight, name });
+    toast.success("Logement sélectionné", { description: name });
     dispatch({ type: "GO", step: "customer" });
   };
 
