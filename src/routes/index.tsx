@@ -341,26 +341,26 @@ function VehicleDatesStep() {
           <Field label="Départ">
             <input
               type="datetime-local"
-              step="900"
+              step="3600"
               required
               min={minDate}
               value={start}
               onChange={(e) => setStart(e.target.value)}
               className="w-full px-4 py-3 rounded-xl bg-white ring-1 ring-black/5 focus:ring-brand focus:outline-none text-base"
             />
-            <p className="text-xs text-neutral-400 mt-1">Créneaux toutes les 15 min : 00, 15, 30, 45</p>
+            <p className="text-xs text-neutral-400 mt-1">Créneaux toutes les heures</p>
           </Field>
           <Field label="Retour">
             <input
               type="datetime-local"
-              step="900"
+              step="3600"
               required
               min={start || minDate}
               value={end}
               onChange={(e) => setEnd(e.target.value)}
               className="w-full px-4 py-3 rounded-xl bg-white ring-1 ring-black/5 focus:ring-brand focus:outline-none text-base"
             />
-            <p className="text-xs text-neutral-400 mt-1">Créneaux toutes les 15 min : 00, 15, 30, 45</p>
+            <p className="text-xs text-neutral-400 mt-1">Créneaux toutes les heures</p>
           </Field>
         </div>
         {err && <p className="text-sm text-destructive">{err}</p>}
