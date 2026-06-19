@@ -293,25 +293,68 @@ function VehicleLocationsStep() {
    STEP 3 — Vehicle dates
    ======================================================================= */
 
+const STANDARD_DURATION_HOURS = 24;
+const AVAILABLE_HOURS = Array.from({ length: 13 }, (_, i) => i + 8); // 08h → 20h
+
+function pad2(n: number) {
+  return n.toString().padStart(2, "0");
+}
+function toDateInput(d: Date) {
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+}
+function combine(date: string, hour: number) {
+  return `${date}T${pad2(hour)}:00`;
+}
+
 function VehicleDatesStep() {
   const { state, dispatch } = useBooking();
-  const [start, setStart] = useState(state.vehicle.startISO?.slice(0, 16) ?? "");
-  const [end, setEnd] = useState(state.vehicle.endISO?.slice(0, 16) ?? "");
+
+  const initialStart = state.vehicle.startISO ? new Date(state.vehicle.startISO) : null;
+  const initialEnd = state.vehicle.endISO ? new Date(state.vehicle.endISO) : null;
+
+  const today = toDateInput(new Date());
+  const [startDate, setStartDate] = useState(initialStart ? toDateInput(initialStart) : today);
+  const [startHour, setStartHour] = useState<number>(initialStart ? initialStart.getHours() : 10);
+
+  // Return date/hour are derived from start + standard duration, but user can override
+  const computeReturn = (date: string, hour: number) => {
+    const s = new Date(combine(date, hour));
+    s.setHours(s.getHours() + STANDARD_DURATION_HOURS);
+    return { date: toDateInput(s), hour: s.getHours() };
+  };
+
+  const [endDate, setEndDate] = useState(
+    initialEnd ? toDateInput(initialEnd) : computeReturn(startDate, startHour).date
+  );
+  const [endHour, setEndHour] = useState<number>(
+    initialEnd ? initialEnd.getHours() : computeReturn(startDate, startHour).hour
+  );
+  const [autoReturn, setAutoReturn] = useState(true);
   const [err, setErr] = useState<string | null>(null);
+
+  // Auto-sync return when start changes & autoReturn enabled
+  useEffect(() => {
+    if (!autoReturn) return;
+    const r = computeReturn(startDate, startHour);
+    setEndDate(r.date);
+    setEndHour(r.hour);
+  }, [startDate, startHour, autoReturn]);
 
   const canSyncFromProperty = Boolean(state.property.checkin && state.property.checkout);
   const syncFromProperty = () => {
     if (!state.property.checkin || !state.property.checkout) return;
-    setStart(`${state.property.checkin}T10:00`);
-    setEnd(`${state.property.checkout}T18:00`);
+    setAutoReturn(false);
+    setStartDate(state.property.checkin);
+    setStartHour(10);
+    setEndDate(state.property.checkout);
+    setEndHour(18);
   };
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
     setErr(null);
-    if (!start || !end) return;
-    const s = new Date(start);
-    const en = new Date(end);
+    const s = new Date(combine(startDate, startHour));
+    const en = new Date(combine(endDate, endHour));
     if (en.getTime() <= s.getTime()) {
       setErr("La date de retour doit être après la date de départ.");
       toast.error("Dates invalides", { description: "La date de retour doit être après la date de départ." });
@@ -325,7 +368,8 @@ function VehicleDatesStep() {
     dispatch({ type: "GO", step: "vehicle-pick" });
   };
 
-  const minDate = new Date().toISOString().slice(0, 16);
+  const inputCls =
+    "w-full px-4 py-3 rounded-xl bg-white ring-1 ring-black/5 focus:ring-brand focus:outline-none text-base";
 
   return (
     <StepShell
@@ -337,32 +381,78 @@ function VehicleDatesStep() {
         {canSyncFromProperty && (
           <SyncDatesButton onClick={syncFromProperty} label="Aligner sur les dates du logement" />
         )}
-        <div className="grid sm:grid-cols-2 gap-4">
-          <Field label="Départ">
-            <input
-              type="datetime-local"
-              step="3600"
-              required
-              min={minDate}
-              value={start}
-              onChange={(e) => setStart(e.target.value)}
-              className="w-full px-4 py-3 rounded-xl bg-white ring-1 ring-black/5 focus:ring-brand focus:outline-none text-base"
-            />
-            <p className="text-xs text-neutral-400 mt-1">Créneaux toutes les heures</p>
-          </Field>
-          <Field label="Retour">
-            <input
-              type="datetime-local"
-              step="3600"
-              required
-              min={start || minDate}
-              value={end}
-              onChange={(e) => setEnd(e.target.value)}
-              className="w-full px-4 py-3 rounded-xl bg-white ring-1 ring-black/5 focus:ring-brand focus:outline-none text-base"
-            />
-            <p className="text-xs text-neutral-400 mt-1">Créneaux toutes les heures</p>
-          </Field>
+
+        <div className="rounded-xl bg-brand/5 ring-1 ring-brand/15 px-4 py-3 text-sm text-neutral-700">
+          Durée standard : <strong>{STANDARD_DURATION_HOURS}h</strong>. Le retour est calculé automatiquement à partir de l'heure de départ.
         </div>
+
+        <fieldset className="space-y-3">
+          <legend className="text-sm font-medium text-neutral-700">Départ</legend>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Date">
+              <input
+                type="date"
+                required
+                min={today}
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                className={inputCls}
+              />
+            </Field>
+            <Field label="Heure">
+              <select
+                required
+                value={startHour}
+                onChange={(e) => setStartHour(Number(e.target.value))}
+                className={inputCls}
+              >
+                {AVAILABLE_HOURS.map((h) => (
+                  <option key={h} value={h}>{pad2(h)}:00</option>
+                ))}
+              </select>
+            </Field>
+          </div>
+        </fieldset>
+
+        <fieldset className="space-y-3">
+          <div className="flex items-center justify-between">
+            <legend className="text-sm font-medium text-neutral-700">Retour</legend>
+            <label className="flex items-center gap-2 text-xs text-neutral-500">
+              <input
+                type="checkbox"
+                checked={autoReturn}
+                onChange={(e) => setAutoReturn(e.target.checked)}
+                className="accent-brand"
+              />
+              Auto (+{STANDARD_DURATION_HOURS}h)
+            </label>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Date">
+              <input
+                type="date"
+                required
+                min={startDate}
+                value={endDate}
+                onChange={(e) => { setAutoReturn(false); setEndDate(e.target.value); }}
+                className={inputCls}
+              />
+            </Field>
+            <Field label="Heure">
+              <select
+                required
+                value={endHour}
+                onChange={(e) => { setAutoReturn(false); setEndHour(Number(e.target.value)); }}
+                className={inputCls}
+              >
+                {AVAILABLE_HOURS.map((h) => (
+                  <option key={h} value={h}>{pad2(h)}:00</option>
+                ))}
+              </select>
+            </Field>
+          </div>
+        </fieldset>
+
         {err && <p className="text-sm text-destructive">{err}</p>}
         <PrimaryButton>Voir les véhicules disponibles</PrimaryButton>
       </form>
