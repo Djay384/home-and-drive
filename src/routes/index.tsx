@@ -678,9 +678,9 @@ function PropertyPickStep() {
           <div className="max-w-screen-xl mx-auto">
             <button
               onClick={() => dispatch({ type: "GO", step: "property-dates" })}
-              className="mb-8 text-xs uppercase tracking-widest text-white/60 hover:text-brand transition-colors"
+              className="mb-8 text-xs uppercase tracking-widest text-neutral-500 hover:text-brand transition-colors inline-flex items-center gap-2"
             >
-              ← Retour
+              <span aria-hidden>←</span> Retour
             </button>
             <div className="mb-12 max-w-[48ch]">
               <span className="text-xs uppercase tracking-[0.2em] text-white/50 mb-4 block">
