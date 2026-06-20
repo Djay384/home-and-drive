@@ -1343,6 +1343,7 @@ function ConfirmationStep() {
       eyebrow="Confirmation"
       title="Merci, votre demande est enregistrée"
       description={`Référence de réservation : ${state.bookingRef}. Vous recevrez un email à ${state.customer.email} avec les détails.`}
+      onBack={() => dispatch({ type: "GO", step: "recap" })}
     >
       <div className="bg-white ring-1 ring-black/5 rounded-3xl p-8">
         <p className="text-sm text-neutral-600 leading-relaxed">
