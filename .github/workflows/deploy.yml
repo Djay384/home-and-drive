@@ -24,13 +24,27 @@ jobs:
           node-version: 22
       - uses: actions/configure-pages@v5
       - run: npm install
-      - name: Build static SPA
-        run: npm run build:static
-      - name: Copy index.html to 404.html for SPA fallback
-        run: cp dist/index.html dist/404.html
+      - name: Build
+        run: npm run build
+      - name: Debug output
+        run: find . -name "index.html" -not -path "*/node_modules/*" 2>/dev/null
+      - name: Locate client build and prepare deployment
+        run: |
+          if [ -d ".vinxi/dist/client" ]; then
+            cp .vinxi/dist/client/index.html .vinxi/dist/client/404.html
+            echo "DIR=.vinxi/dist/client" >> $GITHUB_ENV
+          elif [ -d ".output/public" ]; then
+            cp .output/public/index.html .output/public/404.html 2>/dev/null || true
+            echo "DIR=.output/public" >> $GITHUB_ENV
+          elif [ -d "dist" ]; then
+            cp dist/index.html dist/404.html 2>/dev/null || true
+            echo "DIR=dist" >> $GITHUB_ENV
+          else
+            echo "DIR=.output/public" >> $GITHUB_ENV
+          fi
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: dist
+          path: ${{ env.DIR }}
 
   deploy:
     needs: build
