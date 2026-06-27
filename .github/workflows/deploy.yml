@@ -24,15 +24,13 @@ jobs:
           node-version: 22
       - uses: actions/configure-pages@v5
       - run: npm install
-      - name: Build (static export)
-        run: npm run build
-        env:
-          NITRO_PRESET: static
+      - name: Build static SPA
+        run: npm run build:static
       - name: Copy index.html to 404.html for SPA fallback
-        run: cp .output/public/index.html .output/public/404.html
+        run: cp dist/index.html dist/404.html
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: .output/public
+          path: dist
 
   deploy:
     needs: build
