@@ -24,25 +24,15 @@ jobs:
           node-version: 22
       - uses: actions/configure-pages@v5
       - run: npm install
-      - run: npm run build
-      - name: Debug output structure
-        run: ls -R .output/ 2>/dev/null || ls -R dist/ 2>/dev/null || ls -R .vinxi/ 2>/dev/null || echo "NO OUTPUT FOUND"
-      - name: Locate and copy index.html for SPA fallback
-        run: |
-          INDEX=$(find . -name "index.html" -path "*/public/*" 2>/dev/null | head -1)
-          if [ -z "$INDEX" ]; then
-            INDEX=$(find . -name "index.html" 2>/dev/null | grep -v node_modules | head -1)
-          fi
-          if [ -n "$INDEX" ]; then
-            DIR=$(dirname "$INDEX")
-            cp "$INDEX" "$DIR/404.html"
-            echo "DIR=$DIR" >> $GITHUB_ENV
-          else
-            echo "DIR=.output/public" >> $GITHUB_ENV
-          fi
+      - name: Build (static export)
+        run: npm run build
+        env:
+          NITRO_PRESET: static
+      - name: Copy index.html to 404.html for SPA fallback
+        run: cp .output/public/index.html .output/public/404.html
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: ${{ env.DIR }}
+          path: .output/public
 
   deploy:
     needs: build
