@@ -189,8 +189,78 @@ const STEP_ORDER: Record<BookingType | "default", StepId[]> = {
   ],
 };
 
+const STORAGE_KEY = "routh.booking.state.v1";
+const VALID_STEPS = new Set<StepId>([
+  "intent",
+  "vehicle-locations",
+  "vehicle-dates",
+  "vehicle-pick",
+  "property-dates",
+  "property-pick",
+  "customer",
+  "recap",
+  "confirmation",
+]);
+
+function loadInitial(): BookingState {
+  if (typeof window === "undefined") return initial;
+  try {
+    const raw = window.sessionStorage.getItem(STORAGE_KEY);
+    if (!raw) return initial;
+    const parsed = JSON.parse(raw) as Partial<BookingState>;
+    if (!parsed || typeof parsed !== "object") return initial;
+    // Never restore on the confirmation step — start fresh after a completed booking.
+    if (parsed.step === "confirmation") return initial;
+    return { ...initial, ...parsed } as BookingState;
+  } catch {
+    return initial;
+  }
+}
+
 export function BookingProvider({ children }: { children: ReactNode }) {
-  const [state, dispatch] = useReducer(reducer, initial);
+  const [state, dispatch] = useReducer(reducer, undefined, loadInitial);
+  const skipPushRef = useRef(false);
+
+  // Persist state to sessionStorage so a refresh keeps the user's choices.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      window.sessionStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    } catch {
+      /* ignore quota errors */
+    }
+  }, [state]);
+
+  // Sync state.step with browser history so the back/forward buttons work.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    // Initialise the first history entry with the current step.
+    if (!window.history.state || (window.history.state as { step?: StepId }).step !== state.step) {
+      // On first mount, replace; on subsequent step changes, push.
+      const hasEntry = window.history.state && (window.history.state as { step?: StepId }).step;
+      if (skipPushRef.current) {
+        skipPushRef.current = false;
+      } else if (!hasEntry) {
+        window.history.replaceState({ step: state.step }, "");
+      } else {
+        window.history.pushState({ step: state.step }, "");
+      }
+    }
+  }, [state.step]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const onPop = (event: PopStateEvent) => {
+      const target = (event.state as { step?: StepId } | null)?.step;
+      if (target && VALID_STEPS.has(target)) {
+        skipPushRef.current = true;
+        dispatch({ type: "GO", step: target });
+      }
+    };
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, []);
 
   const value = useMemo(() => {
     const order = STEP_ORDER[state.bookingType ?? "default"];
