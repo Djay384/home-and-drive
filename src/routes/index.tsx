@@ -479,9 +479,29 @@ function SyncDatesButton({ onClick, label }: { onClick: () => void; label: strin
    STEP 4 — Vehicle pick
    ======================================================================= */
 
+type CatalogVehicle = NonNullable<ReturnType<typeof useCatalog>["data"]>["vehicles"][number];
+
+function vehicleDisplayName(name: string) {
+  return name === "Nouvelle Peugeot 208 manuelle" ? "Nouvelle Peugeot 208 active" : name;
+}
+
+function vehicleOptions(v: CatalogVehicle): string[] {
+  const opts: string[] = [];
+  const cat = (v.category ?? "").toLowerCase();
+  const name = (v.name ?? "").toLowerCase();
+  if (v.transmission?.toLowerCase().includes("auto") || name.includes("auto")) opts.push("Carplay / Android Auto");
+  if (cat.includes("utilitaire")) opts.push("Grand volume de chargement");
+  if (cat.includes("eco")) opts.push("Faible consommation");
+  opts.push("Climatisation");
+  opts.push("Assurance tous risques incluse");
+  opts.push("Kilométrage illimité");
+  return Array.from(new Set(opts));
+}
+
 function VehiclePickStep() {
   const { state, dispatch } = useBooking();
   const { data, isLoading } = useCatalog();
+  const [details, setDetails] = useState<CatalogVehicle | null>(null);
 
   const days = (() => {
     if (!state.vehicle.startISO || !state.vehicle.endISO) return 1;
@@ -493,6 +513,7 @@ function VehiclePickStep() {
   const select = (id: string, pricePerDay: number, name: string) => {
     dispatch({ type: "PICK_VEHICLE", id, pricePerDay, name });
     toast.success("Véhicule sélectionné", { description: name });
+    setDetails(null);
     const next = state.bookingType === "both" ? "property-dates" : "customer";
     dispatch({ type: "GO", step: next });
   };
@@ -513,10 +534,10 @@ function VehiclePickStep() {
             <article
               key={v.id}
               className={`group bg-white rounded-2xl overflow-hidden ring-1 ring-black/5 p-4 transition-all ${
-                !v.available ? "opacity-50 grayscale" : "hover:-translate-y-1"
+                !v.available ? "opacity-60 grayscale" : "hover:-translate-y-1"
               }`}
             >
-              <div className="w-full aspect-[4/3] bg-neutral-100 rounded-xl overflow-hidden">
+              <div className="relative w-full aspect-[4/3] bg-neutral-100 rounded-xl overflow-hidden">
                 <img
                   src={resolveImage(v.image_url)}
                   alt={v.name}
@@ -525,12 +546,19 @@ function VehiclePickStep() {
                   height={768}
                   className="w-full h-full object-cover"
                 />
+                {!v.available && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/40">
+                    <span className="px-3 py-1 text-xs uppercase tracking-widest text-white bg-black/70 rounded-full">
+                      Indisponible sur vos dates
+                    </span>
+                  </div>
+                )}
               </div>
               <div className="mt-6 px-2 pb-2">
                 <div className="flex justify-between items-start gap-3">
                   <div>
                     <p className="text-xs uppercase tracking-widest text-neutral-400">{v.category}</p>
-                    <h3 className="text-lg font-medium">{v.name === "Nouvelle Peugeot 208 manuelle" ? "Nouvelle Peugeot 208 active" : v.name}</h3>
+                    <h3 className="text-lg font-medium">{vehicleDisplayName(v.name)}</h3>
                   </div>
                   <span className="text-brand font-medium whitespace-nowrap">
                     {v.price_per_day}€<span className="text-xs text-neutral-400">/jour</span>
@@ -544,24 +572,162 @@ function VehiclePickStep() {
                 {v.description && (
                   <p className="mt-4 text-sm text-neutral-600">{v.description}</p>
                 )}
-                <button
-                  type="button"
-                  disabled={!v.available}
-                  onClick={() => select(v.id, Number(v.price_per_day), v.name)}
-                  className={`mt-6 w-full py-3 px-4 text-sm font-medium rounded-full transition-all ${
-                    v.available
-                      ? "bg-brand text-white hover:bg-brand/90"
-                      : "bg-neutral-100 text-neutral-500 cursor-not-allowed"
-                  }`}
-                >
-                  {v.available ? `Sélectionner · ${Number(v.price_per_day) * days}€` : "Indisponible"}
-                </button>
+                <div className="mt-6 flex flex-col gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setDetails(v)}
+                    className="w-full py-3 px-4 text-sm font-medium rounded-full border border-neutral-300 hover:border-brand hover:text-brand transition-colors"
+                  >
+                    Voir les détails
+                  </button>
+                  <button
+                    type="button"
+                    disabled={!v.available}
+                    onClick={() => select(v.id, Number(v.price_per_day), v.name)}
+                    className={`w-full py-3 px-4 text-sm font-medium rounded-full transition-all ${
+                      v.available
+                        ? "bg-brand text-white hover:bg-brand/90"
+                        : "bg-neutral-100 text-neutral-500 cursor-not-allowed"
+                    }`}
+                  >
+                    {v.available ? `Sélectionner · ${Number(v.price_per_day) * days}€` : "Indisponible"}
+                  </button>
+                </div>
               </div>
             </article>
           ))}
         </div>
       )}
+
+      <VehicleDetailsDialog
+        vehicle={details}
+        days={days}
+        onClose={() => setDetails(null)}
+        onSelect={select}
+      />
     </StepShell>
+  );
+}
+
+function VehicleDetailsDialog({
+  vehicle,
+  days,
+  onClose,
+  onSelect,
+}: {
+  vehicle: CatalogVehicle | null;
+  days: number;
+  onClose: () => void;
+  onSelect: (id: string, pricePerDay: number, name: string) => void;
+}) {
+  if (!vehicle) return null;
+  const options = vehicleOptions(vehicle);
+  const total = Number(vehicle.price_per_day) * days;
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center bg-black/60 px-0 sm:px-4 py-0 sm:py-8 overflow-y-auto"
+      onClick={onClose}
+    >
+      <div
+        className="relative bg-white w-full sm:max-w-2xl sm:rounded-3xl rounded-t-3xl overflow-hidden shadow-2xl my-auto"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Fermer"
+          className="absolute top-4 right-4 z-10 size-9 rounded-full bg-white/90 backdrop-blur flex items-center justify-center text-neutral-700 hover:bg-white shadow"
+        >
+          ✕
+        </button>
+        <div className="w-full aspect-[16/10] bg-neutral-100">
+          <img
+            src={resolveImage(vehicle.image_url)}
+            alt={vehicle.name}
+            className="w-full h-full object-cover"
+          />
+        </div>
+        <div className="p-6 sm:p-8 max-h-[60vh] overflow-y-auto">
+          <p className="text-xs uppercase tracking-widest text-neutral-400">{vehicle.category}</p>
+          <div className="flex justify-between items-start gap-4 mt-1">
+            <h3 className="text-2xl font-medium">{vehicleDisplayName(vehicle.name)}</h3>
+            <span className="text-brand font-medium whitespace-nowrap text-lg">
+              {vehicle.price_per_day}€<span className="text-xs text-neutral-400">/jour</span>
+            </span>
+          </div>
+
+          {vehicle.description && (
+            <p className="mt-4 text-sm text-neutral-600">{vehicle.description}</p>
+          )}
+
+          <section className="mt-6">
+            <h4 className="text-xs uppercase tracking-widest text-neutral-400 mb-3">Caractéristiques</h4>
+            <dl className="grid grid-cols-2 gap-3 text-sm">
+              <div className="rounded-xl bg-neutral-50 p-3">
+                <dt className="text-neutral-500 text-xs">Boîte</dt>
+                <dd className="font-medium capitalize">{vehicle.transmission}</dd>
+              </div>
+              <div className="rounded-xl bg-neutral-50 p-3">
+                <dt className="text-neutral-500 text-xs">Places</dt>
+                <dd className="font-medium">{vehicle.seats}</dd>
+              </div>
+              <div className="rounded-xl bg-neutral-50 p-3">
+                <dt className="text-neutral-500 text-xs">Énergie</dt>
+                <dd className="font-medium capitalize">{vehicle.fuel}</dd>
+              </div>
+              <div className="rounded-xl bg-neutral-50 p-3">
+                <dt className="text-neutral-500 text-xs">Catégorie</dt>
+                <dd className="font-medium capitalize">{vehicle.category}</dd>
+              </div>
+            </dl>
+          </section>
+
+          <section className="mt-6">
+            <h4 className="text-xs uppercase tracking-widest text-neutral-400 mb-3">Options incluses</h4>
+            <ul className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
+              {options.map((opt) => (
+                <li key={opt} className="flex items-start gap-2">
+                  <span className="text-brand mt-0.5">✓</span>
+                  <span className="text-neutral-700">{opt}</span>
+                </li>
+              ))}
+            </ul>
+          </section>
+
+          <section className="mt-6">
+            <h4 className="text-xs uppercase tracking-widest text-neutral-400 mb-3">Conditions de location</h4>
+            <ul className="text-sm text-neutral-700 space-y-1.5 list-disc pl-5">
+              <li>Conducteur âgé de 21 ans minimum, permis B valide depuis 2 ans</li>
+              <li>Caution restituée au retour du véhicule</li>
+              <li>Carburant : plein à plein</li>
+              <li>Annulation gratuite jusqu'à 48h avant le départ</li>
+              <li>Remise des clés à l'aéroport ou au point de retrait choisi</li>
+            </ul>
+          </section>
+        </div>
+
+        <div className="border-t border-neutral-100 p-4 sm:p-6 flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between bg-white">
+          <div className="text-sm">
+            <span className="text-neutral-500">Total pour {days} jour{days > 1 ? "s" : ""} : </span>
+            <span className="font-medium text-neutral-900">{total}€</span>
+          </div>
+          <button
+            type="button"
+            disabled={!vehicle.available}
+            onClick={() => onSelect(vehicle.id, Number(vehicle.price_per_day), vehicle.name)}
+            className={`w-full sm:w-auto py-3 px-6 text-sm font-medium rounded-full transition-all ${
+              vehicle.available
+                ? "bg-brand text-white hover:bg-brand/90"
+                : "bg-neutral-100 text-neutral-500 cursor-not-allowed"
+            }`}
+          >
+            {vehicle.available ? "Sélectionner ce véhicule" : "Indisponible sur vos dates"}
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 
