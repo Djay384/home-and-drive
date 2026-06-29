@@ -2,17 +2,18 @@ import { createServerFn } from "@tanstack/react-start";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { createPaymentIntentSchema } from "./booking-schemas";
 
-const stripeKey = () => process.env.STRIPE_SECRET_KEY;
-function getStripe() {
-  const Stripe = globalThis as unknown as {
-    __stripe?: ReturnType<typeof import("stripe").default>;
-  };
-  if (!Stripe.__stripe) {
-    const key = stripeKey();
+let _stripe: unknown = null;
+async function getStripe() {
+  if (!_stripe) {
+    const key = process.env.STRIPE_SECRET_KEY;
     if (!key) throw new Error("STRIPE_SECRET_KEY non configurée");
-    Stripe.__stripe = new (require("stripe"))(key, { apiVersion: "2025-03-31.final" });
+    const Stripe = await import("stripe");
+    _stripe = new Stripe.default(key, { apiVersion: "2025-03-31.final" as never });
   }
-  return Stripe.__stripe;
+  return _stripe as {
+    paymentIntents: { create: Function; retrieve: Function };
+    checkout: { sessions: { create: Function } };
+  };
 }
 
 export const createPaymentIntent = createServerFn({ method: "POST" })
@@ -27,7 +28,7 @@ export const createPaymentIntent = createServerFn({ method: "POST" })
     if (error || !booking) throw new Error("Réservation introuvable");
     if (booking.amount_charged <= 0) throw new Error("Montant invalide");
 
-    const stripe = getStripe();
+    const stripe = await getStripe();
     const paymentIntent = await stripe.paymentIntents.create({
       amount: Math.round(Number(booking.amount_charged) * 100),
       currency: "eur",
@@ -65,7 +66,7 @@ export const confirmPayment = createServerFn({ method: "POST" }).handler(
       throw new Error("Incohérence du paiement");
     }
 
-    const stripe = getStripe();
+    const stripe = await getStripe();
     const intent = await stripe.paymentIntents.retrieve(data.paymentIntentId);
 
     if (intent.status !== "succeeded") {
@@ -96,7 +97,7 @@ export const createCheckoutSession = createServerFn({ method: "POST" })
     if (error || !booking) throw new Error("Réservation introuvable");
 
     const baseUrl = process.env.PUBLIC_URL || "http://localhost:3000";
-    const stripe = getStripe();
+    const stripe = await getStripe();
 
     const session = await stripe.checkout.sessions.create({
       mode: "payment",
