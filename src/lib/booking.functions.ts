@@ -1,9 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
-import {
-  checkAvailabilitySchema,
-  createBookingSchema,
-} from "./booking-schemas";
+import { checkAvailabilitySchema, createBookingSchema } from "./booking-schemas";
 import { computeBookingPlan } from "./booking-pricing";
 
 /**
@@ -72,12 +69,7 @@ export const getCatalog = createServerFn({ method: "POST" })
       let available = true;
       if (data.propertyCheckin && data.propertyCheckout) {
         for (const b of bookings) {
-          if (
-            b.property_id !== p.id ||
-            !b.property_checkin ||
-            !b.property_checkout
-          )
-            continue;
+          if (b.property_id !== p.id || !b.property_checkin || !b.property_checkout) continue;
           if (
             data.propertyCheckin < b.property_checkout &&
             data.propertyCheckout > b.property_checkin
@@ -190,32 +182,39 @@ export const createBooking = createServerFn({ method: "POST" })
       }
     }
 
+    const insertPayload: Record<string, unknown> = {
+      booking_type: data.bookingType,
+      customer_name: data.customer.name,
+      customer_email: data.customer.email,
+      customer_phone: data.customer.phone,
+      flight_info: data.customer.flight ?? null,
+      vehicle_id: plan.vehicleId,
+      pickup_location_id: data.vehicleDates?.pickupLocationId ?? null,
+      dropoff_location_id: data.vehicleDates?.dropoffLocationId ?? null,
+      vehicle_start: plan.vehicleStart,
+      vehicle_end: plan.vehicleEnd,
+      vehicle_total: plan.vehicleTotal,
+      property_id: plan.propertyId,
+      property_checkin: plan.propertyCheckin,
+      property_checkout: plan.propertyCheckout,
+      property_guests: plan.propertyGuests,
+      property_total: plan.propertyTotal,
+      total_amount: plan.totalAmount,
+      deposit_amount: plan.depositAmount,
+      payment_mode: plan.paymentMode,
+      amount_charged: plan.amountCharged,
+      payment_status: "pending",
+      expires_at: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
+      driver_license: data.driver.licenseNumber,
+      driver_birth_date: data.driver.birthDate,
+      driver_address: data.driver.address,
+      driver_city: data.driver.city,
+      driver_postal_code: data.driver.postalCode,
+    };
+
     const { data: booking, error: insertError } = await supabaseAdmin
       .from("bookings")
-      .insert({
-        booking_type: data.bookingType,
-        customer_name: data.customer.name,
-        customer_email: data.customer.email,
-        customer_phone: data.customer.phone,
-        flight_info: data.customer.flight ?? null,
-        vehicle_id: plan.vehicleId,
-        pickup_location_id: data.vehicleDates?.pickupLocationId ?? null,
-        dropoff_location_id: data.vehicleDates?.dropoffLocationId ?? null,
-        vehicle_start: plan.vehicleStart,
-        vehicle_end: plan.vehicleEnd,
-        vehicle_total: plan.vehicleTotal,
-        property_id: plan.propertyId,
-        property_checkin: plan.propertyCheckin,
-        property_checkout: plan.propertyCheckout,
-        property_guests: plan.propertyGuests,
-        property_total: plan.propertyTotal,
-        total_amount: plan.totalAmount,
-        deposit_amount: plan.depositAmount,
-        payment_mode: plan.paymentMode,
-        amount_charged: plan.amountCharged,
-        payment_status: "pending",
-        expires_at: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
-      })
+      .insert(insertPayload as never)
       .select("id, reference, total_amount, amount_charged, payment_mode")
       .single();
 

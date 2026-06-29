@@ -1,5 +1,13 @@
-import { createContext, useContext, useEffect, useMemo, useReducer, useRef, type ReactNode } from "react";
-import type { BookingType, PaymentMode } from "@/lib/booking-schemas";
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useMemo,
+  useReducer,
+  useRef,
+  type ReactNode,
+} from "react";
+import type { BookingType, DriverInfo, PaymentMode } from "@/lib/booking-schemas";
 
 export type StepId =
   | "intent"
@@ -38,9 +46,13 @@ export interface BookingState {
     phone: string;
     flight: string;
   };
+  driver: DriverInfo;
   paymentMode: PaymentMode;
-  // Result after booking creation
+  // Results after booking creation
   bookingRef: string | null;
+  bookingId: string | null;
+  paymentIntentId: string | null;
+  paymentStatus: "pending" | "paid" | null;
 }
 
 const initial: BookingState = {
@@ -64,8 +76,19 @@ const initial: BookingState = {
     name: null,
   },
   customer: { name: "", email: "", phone: "", flight: "" },
+  driver: {
+    licenseNumber: "",
+    birthDate: "",
+    address: "",
+    city: "",
+    postalCode: "",
+    country: "Guadeloupe",
+  },
   paymentMode: "deposit",
   bookingRef: null,
+  bookingId: null,
+  paymentIntentId: null,
+  paymentStatus: null,
 };
 
 type Action =
@@ -77,8 +100,11 @@ type Action =
   | { type: "SET_PROPERTY_DATES"; checkin: string; checkout: string; guests: number }
   | { type: "PICK_PROPERTY"; id: string; pricePerNight: number; name: string }
   | { type: "SET_CUSTOMER"; value: BookingState["customer"] }
+  | { type: "SET_DRIVER"; value: BookingState["driver"] }
   | { type: "SET_PAYMENT_MODE"; value: PaymentMode }
-  | { type: "SET_BOOKING_REF"; value: string }
+  | { type: "SET_BOOKING_RESULT"; bookingRef: string; bookingId: string }
+  | { type: "SET_PAYMENT_INTENT"; value: string }
+  | { type: "SET_PAYMENT_STATUS"; value: "pending" | "paid" }
   | { type: "RESET" };
 
 function reducer(state: BookingState, action: Action): BookingState {
@@ -137,10 +163,21 @@ function reducer(state: BookingState, action: Action): BookingState {
       };
     case "SET_CUSTOMER":
       return { ...state, customer: action.value };
+    case "SET_DRIVER":
+      return { ...state, driver: action.value };
     case "SET_PAYMENT_MODE":
       return { ...state, paymentMode: action.value };
-    case "SET_BOOKING_REF":
-      return { ...state, bookingRef: action.value, step: "confirmation" };
+    case "SET_BOOKING_RESULT":
+      return {
+        ...state,
+        bookingRef: action.bookingRef,
+        bookingId: action.bookingId,
+        step: "confirmation",
+      };
+    case "SET_PAYMENT_INTENT":
+      return { ...state, paymentIntentId: action.value };
+    case "SET_PAYMENT_STATUS":
+      return { ...state, paymentStatus: action.value };
     case "RESET":
       return initial;
     default:
@@ -168,14 +205,7 @@ const STEP_ORDER: Record<BookingType | "default", StepId[]> = {
     "recap",
     "confirmation",
   ],
-  property: [
-    "intent",
-    "property-dates",
-    "property-pick",
-    "customer",
-    "recap",
-    "confirmation",
-  ],
+  property: ["intent", "property-dates", "property-pick", "customer", "recap", "confirmation"],
   both: [
     "intent",
     "vehicle-locations",

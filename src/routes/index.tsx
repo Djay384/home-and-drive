@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useSearch } from "@tanstack/react-router";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { Bath, BedDouble, DoorClosed } from "lucide-react";
@@ -6,6 +6,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { getCatalog, createBooking } from "@/lib/booking.functions";
+import { createPaymentIntent, confirmPayment } from "@/lib/payment.functions";
 import { resolveImage, heroGuadeloupe } from "@/assets";
 import routhLogo from "@/assets/routh-logo.asset.json";
 import {
@@ -18,6 +19,8 @@ import {
 import { ProgressBar } from "@/features/booking/progress-bar";
 import { StepShell } from "@/features/booking/step-shell";
 import { DEPOSIT_RATIO } from "@/lib/booking-schemas";
+import { StripePaymentForm, StripeWrapper } from "@/components/StripePaymentForm";
+import { generateReceiptPdf } from "@/lib/pdf-receipt";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -31,8 +34,7 @@ export const Route = createFileRoute("/")({
       { property: "og:title", content: "Routh Location — Guadeloupe" },
       {
         property: "og:description",
-        content:
-          "Location voiture & logement en Guadeloupe — réservation et paiement en ligne.",
+        content: "Location voiture & logement en Guadeloupe — réservation et paiement en ligne.",
       },
     ],
   }),
@@ -119,9 +121,23 @@ function IntentStep() {
             sub="Liberté totale sur les routes de l'île."
             onClick={() => choose("vehicle")}
             icon={
-              <svg className="size-5 text-brand" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 18.75a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0zM19.5 18.75a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0z" />
-                <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12.75h19.5M5.25 7.5h13.5l1.5 5.25v5.25h-2.25M5.25 7.5L3.75 12.75v5.25h2.25" />
+              <svg
+                className="size-5 text-brand"
+                fill="none"
+                viewBox="0 0 24 24"
+                strokeWidth="1.5"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M8.25 18.75a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0zM19.5 18.75a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0z"
+                />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M2.25 12.75h19.5M5.25 7.5h13.5l1.5 5.25v5.25h-2.25M5.25 7.5L3.75 12.75v5.25h2.25"
+                />
               </svg>
             }
           />
@@ -130,8 +146,18 @@ function IntentStep() {
             sub="Villas de caractère et havres de paix."
             onClick={() => choose("property")}
             icon={
-              <svg className="size-5 text-brand" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12 12 3l9.75 9M4.5 10.5V21h15V10.5" />
+              <svg
+                className="size-5 text-brand"
+                fill="none"
+                viewBox="0 0 24 24"
+                strokeWidth="1.5"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M2.25 12 12 3l9.75 9M4.5 10.5V21h15V10.5"
+                />
               </svg>
             }
           />
@@ -141,8 +167,18 @@ function IntentStep() {
             sub="Le pack complet pour une sérénité maximale."
             onClick={() => choose("both")}
             icon={
-              <svg className="size-5 text-white" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12z" />
+              <svg
+                className="size-5 text-white"
+                fill="none"
+                viewBox="0 0 24 24"
+                strokeWidth="1.5"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12z"
+                />
               </svg>
             }
           />
@@ -152,8 +188,18 @@ function IntentStep() {
   );
 }
 
-function IntentCard({ label, sub, icon, onClick, dark }: {
-  label: string; sub: string; icon: React.ReactNode; onClick: () => void; dark?: boolean;
+function IntentCard({
+  label,
+  sub,
+  icon,
+  onClick,
+  dark,
+}: {
+  label: string;
+  sub: string;
+  icon: React.ReactNode;
+  onClick: () => void;
+  dark?: boolean;
 }) {
   return (
     <button
@@ -165,7 +211,9 @@ function IntentCard({ label, sub, icon, onClick, dark }: {
           : "bg-white ring-black/5 hover:ring-brand/40"
       }`}
     >
-      <div className={`size-10 mb-6 flex items-center justify-center rounded-full ${dark ? "bg-white/10" : "bg-brand/10"}`}>
+      <div
+        className={`size-10 mb-6 flex items-center justify-center rounded-full ${dark ? "bg-white/10" : "bg-brand/10"}`}
+      >
         {icon}
       </div>
       <h3 className={`text-xl font-medium mb-2 ${dark ? "text-white" : ""}`}>{label}</h3>
@@ -231,7 +279,9 @@ function VehicleLocationsStep() {
       ) : (
         <form onSubmit={submit} className="space-y-8">
           <fieldset className="space-y-3">
-            <legend className="text-xs uppercase tracking-widest text-neutral-500 mb-2">Lieu de prise en charge</legend>
+            <legend className="text-xs uppercase tracking-widest text-neutral-500 mb-2">
+              Lieu de prise en charge
+            </legend>
             <div className="grid sm:grid-cols-3 gap-3">
               {data?.locations.map((loc) => (
                 <button
@@ -262,7 +312,9 @@ function VehicleLocationsStep() {
 
           {!same && (
             <fieldset className="space-y-3">
-              <legend className="text-xs uppercase tracking-widest text-neutral-500 mb-2">Lieu de restitution</legend>
+              <legend className="text-xs uppercase tracking-widest text-neutral-500 mb-2">
+                Lieu de restitution
+              </legend>
               <div className="grid sm:grid-cols-3 gap-3">
                 {data?.locations.map((loc) => (
                   <button
@@ -324,10 +376,10 @@ function VehicleDatesStep() {
   };
 
   const [endDate, setEndDate] = useState(
-    initialEnd ? toDateInput(initialEnd) : computeReturn(startDate, startHour).date
+    initialEnd ? toDateInput(initialEnd) : computeReturn(startDate, startHour).date,
   );
   const [endHour, setEndHour] = useState<number>(
-    initialEnd ? initialEnd.getHours() : computeReturn(startDate, startHour).hour
+    initialEnd ? initialEnd.getHours() : computeReturn(startDate, startHour).hour,
   );
   const [autoReturn, setAutoReturn] = useState(true);
   const [err, setErr] = useState<string | null>(null);
@@ -357,7 +409,9 @@ function VehicleDatesStep() {
     const en = new Date(combine(endDate, endHour));
     if (en.getTime() <= s.getTime()) {
       setErr("La date de retour doit être après la date de départ.");
-      toast.error("Dates invalides", { description: "La date de retour doit être après la date de départ." });
+      toast.error("Dates invalides", {
+        description: "La date de retour doit être après la date de départ.",
+      });
       return;
     }
     dispatch({
@@ -383,7 +437,8 @@ function VehicleDatesStep() {
         )}
 
         <div className="rounded-xl bg-brand/5 ring-1 ring-brand/15 px-4 py-3 text-sm text-neutral-700">
-          Durée standard : <strong>{STANDARD_DURATION_HOURS}h</strong>. Le retour est calculé automatiquement à partir de l'heure de départ.
+          Durée standard : <strong>{STANDARD_DURATION_HOURS}h</strong>. Le retour est calculé
+          automatiquement à partir de l'heure de départ.
         </div>
 
         <fieldset className="space-y-3">
@@ -407,7 +462,9 @@ function VehicleDatesStep() {
                 className={inputCls}
               >
                 {AVAILABLE_HOURS.map((h) => (
-                  <option key={h} value={h}>{pad2(h)}:00</option>
+                  <option key={h} value={h}>
+                    {pad2(h)}:00
+                  </option>
                 ))}
               </select>
             </Field>
@@ -434,7 +491,10 @@ function VehicleDatesStep() {
                 required
                 min={startDate}
                 value={endDate}
-                onChange={(e) => { setAutoReturn(false); setEndDate(e.target.value); }}
+                onChange={(e) => {
+                  setAutoReturn(false);
+                  setEndDate(e.target.value);
+                }}
                 className={inputCls}
               />
             </Field>
@@ -442,11 +502,16 @@ function VehicleDatesStep() {
               <select
                 required
                 value={endHour}
-                onChange={(e) => { setAutoReturn(false); setEndHour(Number(e.target.value)); }}
+                onChange={(e) => {
+                  setAutoReturn(false);
+                  setEndHour(Number(e.target.value));
+                }}
                 className={inputCls}
               >
                 {AVAILABLE_HOURS.map((h) => (
-                  <option key={h} value={h}>{pad2(h)}:00</option>
+                  <option key={h} value={h}>
+                    {pad2(h)}:00
+                  </option>
                 ))}
               </select>
             </Field>
@@ -468,7 +533,11 @@ function SyncDatesButton({ onClick, label }: { onClick: () => void; label: strin
       className="inline-flex items-center gap-2 px-4 py-2.5 rounded-full bg-brand/10 text-brand text-sm font-medium ring-1 ring-brand/20 hover:bg-brand/15 transition-colors"
     >
       <svg className="size-4" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" />
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99"
+        />
       </svg>
       {label}
     </button>
@@ -489,7 +558,8 @@ function vehicleOptions(v: CatalogVehicle): string[] {
   const opts: string[] = [];
   const cat = (v.category ?? "").toLowerCase();
   const name = (v.name ?? "").toLowerCase();
-  if (v.transmission?.toLowerCase().includes("auto") || name.includes("auto")) opts.push("Carplay / Android Auto");
+  if (v.transmission?.toLowerCase().includes("auto") || name.includes("auto"))
+    opts.push("Carplay / Android Auto");
   if (cat.includes("utilitaire")) opts.push("Grand volume de chargement");
   if (cat.includes("eco")) opts.push("Faible consommation");
   opts.push("Climatisation");
@@ -557,7 +627,9 @@ function VehiclePickStep() {
               <div className="mt-6 px-2 pb-2">
                 <div className="flex justify-between items-start gap-3">
                   <div>
-                    <p className="text-xs uppercase tracking-widest text-neutral-400">{v.category}</p>
+                    <p className="text-xs uppercase tracking-widest text-neutral-400">
+                      {v.category}
+                    </p>
                     <h3 className="text-lg font-medium">{vehicleDisplayName(v.name)}</h3>
                   </div>
                   <span className="text-brand font-medium whitespace-nowrap">
@@ -569,9 +641,7 @@ function VehiclePickStep() {
                   <Pill>{v.seats} places</Pill>
                   <Pill>{v.fuel}</Pill>
                 </div>
-                {v.description && (
-                  <p className="mt-4 text-sm text-neutral-600">{v.description}</p>
-                )}
+                {v.description && <p className="mt-4 text-sm text-neutral-600">{v.description}</p>}
                 <div className="mt-6 flex flex-col gap-2">
                   <button
                     type="button"
@@ -590,7 +660,9 @@ function VehiclePickStep() {
                         : "bg-neutral-100 text-neutral-500 cursor-not-allowed"
                     }`}
                   >
-                    {v.available ? `Sélectionner · ${Number(v.price_per_day) * days}€` : "Indisponible"}
+                    {v.available
+                      ? `Sélectionner · ${Number(v.price_per_day) * days}€`
+                      : "Indisponible"}
                   </button>
                 </div>
               </div>
@@ -663,7 +735,9 @@ function VehicleDetailsDialog({
           )}
 
           <section className="mt-6">
-            <h4 className="text-xs uppercase tracking-widest text-neutral-400 mb-3">Caractéristiques</h4>
+            <h4 className="text-xs uppercase tracking-widest text-neutral-400 mb-3">
+              Caractéristiques
+            </h4>
             <dl className="grid grid-cols-2 gap-3 text-sm">
               <div className="rounded-xl bg-neutral-50 p-3">
                 <dt className="text-neutral-500 text-xs">Boîte</dt>
@@ -685,7 +759,9 @@ function VehicleDetailsDialog({
           </section>
 
           <section className="mt-6">
-            <h4 className="text-xs uppercase tracking-widest text-neutral-400 mb-3">Options incluses</h4>
+            <h4 className="text-xs uppercase tracking-widest text-neutral-400 mb-3">
+              Options incluses
+            </h4>
             <ul className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
               {options.map((opt) => (
                 <li key={opt} className="flex items-start gap-2">
@@ -697,7 +773,9 @@ function VehicleDetailsDialog({
           </section>
 
           <section className="mt-6">
-            <h4 className="text-xs uppercase tracking-widest text-neutral-400 mb-3">Conditions de location</h4>
+            <h4 className="text-xs uppercase tracking-widest text-neutral-400 mb-3">
+              Conditions de location
+            </h4>
             <ul className="text-sm text-neutral-700 space-y-1.5 list-disc pl-5">
               <li>Conducteur âgé de 21 ans minimum, permis B valide depuis 2 ans</li>
               <li>Caution restituée au retour du véhicule</li>
@@ -710,7 +788,9 @@ function VehicleDetailsDialog({
 
         <div className="border-t border-neutral-100 p-4 sm:p-6 flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between bg-white">
           <div className="text-sm">
-            <span className="text-neutral-500">Total pour {days} jour{days > 1 ? "s" : ""} : </span>
+            <span className="text-neutral-500">
+              Total pour {days} jour{days > 1 ? "s" : ""} :{" "}
+            </span>
             <span className="font-medium text-neutral-900">{total}€</span>
           </div>
           <button
@@ -756,7 +836,9 @@ function PropertyDatesStep() {
     if (!checkin || !checkout) return;
     if (checkout <= checkin) {
       setErr("La date de départ doit être après l'arrivée.");
-      toast.error("Dates invalides", { description: "La date de départ doit être après l'arrivée." });
+      toast.error("Dates invalides", {
+        description: "La date de départ doit être après l'arrivée.",
+      });
       return;
     }
     dispatch({ type: "SET_PROPERTY_DATES", checkin, checkout, guests });
@@ -785,14 +867,20 @@ function PropertyDatesStep() {
         <div className="grid sm:grid-cols-2 gap-4">
           <Field label="Arrivée">
             <input
-              type="date" required min={today} value={checkin}
+              type="date"
+              required
+              min={today}
+              value={checkin}
               onChange={(e) => setCheckin(e.target.value)}
               className="w-full px-4 py-3 rounded-xl bg-white ring-1 ring-black/5 focus:ring-brand focus:outline-none text-base"
             />
           </Field>
           <Field label="Départ">
             <input
-              type="date" required min={checkin || today} value={checkout}
+              type="date"
+              required
+              min={checkin || today}
+              value={checkout}
               onChange={(e) => setCheckout(e.target.value)}
               className="w-full px-4 py-3 rounded-xl bg-white ring-1 ring-black/5 focus:ring-brand focus:outline-none text-base"
             />
@@ -800,7 +888,11 @@ function PropertyDatesStep() {
         </div>
         <Field label="Nombre de voyageurs">
           <input
-            type="number" min={1} max={20} required value={guests}
+            type="number"
+            min={1}
+            max={20}
+            required
+            value={guests}
             onChange={(e) => setGuests(Number(e.target.value))}
             className="w-full px-4 py-3 rounded-xl bg-white ring-1 ring-black/5 focus:ring-brand focus:outline-none text-base"
           />
@@ -862,12 +954,17 @@ function PropertyPickStep() {
                 <article key={p.id} className={!p.available ? "opacity-50" : ""}>
                   <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-end mb-8">
                     <div className="lg:col-span-8">
-                      <p className="text-xs uppercase tracking-widest text-brand mb-2">{p.location}</p>
+                      <p className="text-xs uppercase tracking-widest text-brand mb-2">
+                        {p.location}
+                      </p>
                       <h3 className="text-3xl md:text-4xl font-serif font-medium">{p.name}</h3>
                     </div>
                     <div className="lg:col-span-4 lg:text-right">
                       <p className="text-2xl font-serif italic">
-                        {Number(p.price_per_night) === 180 || Number(p.price_per_night) === 450 ? 80 : p.price_per_night}€
+                        {Number(p.price_per_night) === 180 || Number(p.price_per_night) === 450
+                          ? 80
+                          : p.price_per_night}
+                        €
                         <span className="text-sm uppercase tracking-widest not-italic opacity-60 ml-2">
                           / NUIT
                         </span>
@@ -892,20 +989,34 @@ function PropertyPickStep() {
                   <div className="grid grid-cols-3 gap-3 md:gap-6 mt-8">
                     {(() => {
                       const desc = p.description ?? "";
-                      const parts = desc.split("·").map((s) => s.trim()).filter(Boolean);
+                      const parts = desc
+                        .split("·")
+                        .map((s) => s.trim())
+                        .filter(Boolean);
                       const pick = (kw: string) => parts.find((x) => x.toLowerCase().includes(kw));
                       const items = [
-                        { 
-                          label: (pick("chambre") ?? `${p.bedrooms} chambre${p.bedrooms > 1 ? "s" : ""}`).replace("1 chambre · 2 lits · 1 salle de bain privée", "1 chambre · 2 lits · 1 salle de bain\u00a0"), 
-                          icon: DoorClosed 
+                        {
+                          label: (
+                            pick("chambre") ?? `${p.bedrooms} chambre${p.bedrooms > 1 ? "s" : ""}`
+                          ).replace(
+                            "1 chambre · 2 lits · 1 salle de bain privée",
+                            "1 chambre · 2 lits · 1 salle de bain\u00a0",
+                          ),
+                          icon: DoorClosed,
                         },
-                        { 
-                          label: (pick("lit") ?? `${p.capacity} lits`).replace("2 lits", "\u00a02 lits"), 
-                          icon: BedDouble 
+                        {
+                          label: (pick("lit") ?? `${p.capacity} lits`).replace(
+                            "2 lits",
+                            "\u00a02 lits",
+                          ),
+                          icon: BedDouble,
                         },
-                        { 
-                          label: (pick("salle de bain") ?? "Salle de bain privée").replace("1 salle de bain privée", "1 salle de bain\u00a0"), 
-                          icon: Bath 
+                        {
+                          label: (pick("salle de bain") ?? "Salle de bain privée").replace(
+                            "1 salle de bain privée",
+                            "1 salle de bain\u00a0",
+                          ),
+                          icon: Bath,
                         },
                       ];
                       return items.map(({ label, icon: Icon }) => (
@@ -935,11 +1046,21 @@ function PropertyPickStep() {
                           })
                           .slice(0, 6)
                           .map((a) => (
-                            <li key={a} className="flex items-center gap-3 text-sm text-neutral-300">
-                              <svg className="size-4 text-brand shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <li
+                              key={a}
+                              className="flex items-center gap-3 text-sm text-neutral-300"
+                            >
+                              <svg
+                                className="size-4 text-brand shrink-0"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                stroke="currentColor"
+                              >
                                 <path d="M5 13l4 4L19 7" strokeWidth="2" />
                               </svg>
-                              {a === "Jardin tropical" ? "Jardin tropical\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n" : a}
+                              {a === "Jardin tropical"
+                                ? "Jardin tropical\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n"
+                                : a}
                             </li>
                           ))}
                       </ul>
@@ -956,7 +1077,11 @@ function PropertyPickStep() {
                         <div className="space-y-1">
                           <div className="flex items-baseline gap-2">
                             <span className="text-3xl font-serif font-medium text-white">
-                              {Number(p.price_per_night) === 180 || Number(p.price_per_night) === 450 ? 80 : p.price_per_night}€
+                              {Number(p.price_per_night) === 180 ||
+                              Number(p.price_per_night) === 450
+                                ? 80
+                                : p.price_per_night}
+                              €
                             </span>
                             <span className="text-xs uppercase tracking-widest text-white/60">
                               / NUIT
@@ -965,7 +1090,14 @@ function PropertyPickStep() {
                           <p className="text-sm text-white/70">
                             {nights} nuit{nights > 1 ? "s" : ""} ·{" "}
                             <span className="text-white font-medium">
-                              Total {Number(Number(p.price_per_night) === 180 || Number(p.price_per_night) === 450 ? 80 : p.price_per_night) * nights}€
+                              Total{" "}
+                              {Number(
+                                Number(p.price_per_night) === 180 ||
+                                  Number(p.price_per_night) === 450
+                                  ? 80
+                                  : p.price_per_night,
+                              ) * nights}
+                              €
                             </span>
                           </p>
                         </div>
@@ -982,7 +1114,12 @@ function PropertyPickStep() {
                           {p.available ? (
                             <>
                               <span className="p-1.5 bg-white/20 rounded-full mr-3">
-                                <svg className="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <svg
+                                  className="size-4"
+                                  fill="none"
+                                  viewBox="0 0 24 24"
+                                  stroke="currentColor"
+                                >
                                   <path d="M12 4.5v15m7.5-7.5h-15" strokeWidth="2" />
                                 </svg>
                               </span>
@@ -1043,13 +1180,38 @@ const PHONE_RULES: Record<
     example: "6 12 34 56 78",
     country: "France",
   },
-  "+596": { len: 9, startsWith: ["596", "696", "697"], example: "696 12 34 56", country: "Martinique" },
+  "+596": {
+    len: 9,
+    startsWith: ["596", "696", "697"],
+    example: "696 12 34 56",
+    country: "Martinique",
+  },
   "+594": { len: 9, startsWith: ["594", "694"], example: "694 12 34 56", country: "Guyane" },
-  "+1": { len: 10, startsWith: ["2", "3", "4", "5", "6", "7", "8", "9"], example: "415 555 0132", country: "USA / Canada" },
-  "+44": { len: [10, 11], startsWith: ["7", "1", "2", "3"], example: "7400 123456", country: "Royaume-Uni" },
-  "+49": { len: [10, 11], startsWith: ["15", "16", "17", "30", "40", "89"], example: "151 23456789", country: "Allemagne" },
+  "+1": {
+    len: 10,
+    startsWith: ["2", "3", "4", "5", "6", "7", "8", "9"],
+    example: "415 555 0132",
+    country: "USA / Canada",
+  },
+  "+44": {
+    len: [10, 11],
+    startsWith: ["7", "1", "2", "3"],
+    example: "7400 123456",
+    country: "Royaume-Uni",
+  },
+  "+49": {
+    len: [10, 11],
+    startsWith: ["15", "16", "17", "30", "40", "89"],
+    example: "151 23456789",
+    country: "Allemagne",
+  },
   "+32": { len: 9, startsWith: ["4", "2", "3", "9"], example: "470 12 34 56", country: "Belgique" },
-  "+41": { len: 9, startsWith: ["7", "2", "3", "4", "5", "6", "8"], example: "76 123 45 67", country: "Suisse" },
+  "+41": {
+    len: 9,
+    startsWith: ["7", "2", "3", "4", "5", "6", "8"],
+    example: "76 123 45 67",
+    country: "Suisse",
+  },
 };
 
 function lenLabel(len: number | number[]): string {
@@ -1058,10 +1220,12 @@ function lenLabel(len: number | number[]): string {
 
 function validatePhone(dial: string, local: string): string | null {
   if (!local) return "Veuillez saisir votre numéro de téléphone.";
-  if (!/^\d+$/.test(local)) return "Le numéro doit contenir uniquement des chiffres (0-9), sans espaces ni tirets.";
+  if (!/^\d+$/.test(local))
+    return "Le numéro doit contenir uniquement des chiffres (0-9), sans espaces ni tirets.";
   const rule = PHONE_RULES[dial];
   if (!rule) {
-    if (local.length < 6 || local.length > 12) return "Le numéro doit contenir entre 6 et 12 chiffres.";
+    if (local.length < 6 || local.length > 12)
+      return "Le numéro doit contenir entre 6 et 12 chiffres.";
     return null;
   }
   const lens = Array.isArray(rule.len) ? rule.len : [rule.len];
@@ -1078,7 +1242,8 @@ function formatPhonePretty(full: string): string {
   const { dial, local } = splitPhone(full);
   if (!local) return full;
   // Group digits in pairs from the right, first group may be 1-3 digits
-  const head = local.length % 2 === 1 ? local.slice(0, local.length === 9 ? 3 : 1) : local.slice(0, 2);
+  const head =
+    local.length % 2 === 1 ? local.slice(0, local.length === 9 ? 3 : 1) : local.slice(0, 2);
   const rest = local.slice(head.length).match(/.{1,2}/g) ?? [];
   return `${dial} ${[head, ...rest].join(" ")}`.trim();
 }
@@ -1091,28 +1256,30 @@ function maskPhonePretty(full: string): string {
   const maskedLen = Math.max(0, local.length - visibleStart.length - visibleEnd.length);
   const masked = visibleStart + "•".repeat(maskedLen) + visibleEnd;
   // re-group like formatPhonePretty
-  const head = masked.length % 2 === 1 ? masked.slice(0, masked.length === 9 ? 3 : 1) : masked.slice(0, 2);
+  const head =
+    masked.length % 2 === 1 ? masked.slice(0, masked.length === 9 ? 3 : 1) : masked.slice(0, 2);
   const rest = masked.slice(head.length).match(/.{1,2}/g) ?? [];
   return `${dial} ${[head, ...rest].join(" ")}`.trim();
 }
-
 
 function CustomerStep() {
   const { state, dispatch } = useBooking();
   const initial = splitPhone(state.customer.phone || "+590");
   const [form, setForm] = useState(state.customer);
+  const [driver, setDriver] = useState(state.driver);
   const [dial, setDial] = useState(initial.dial);
   const [local, setLocal] = useState(initial.local);
   const [phoneError, setPhoneError] = useState<string | null>(null);
   const phoneInputRef = useRef<HTMLInputElement>(null);
+  const [showDriver, setShowDriver] = useState(
+    state.bookingType === "vehicle" || state.bookingType === "both",
+  );
 
   const rule = PHONE_RULES[dial];
   const phoneExample = rule
     ? `Ex : ${rule.example} — ${lenLabel(rule.len)} chiffres, préfixes autorisés : ${rule.startsWith.join(", ")}.`
     : "6 à 12 chiffres";
 
-  // Live re-validation: any time dial or local changes, re-run rules.
-  // Only show the error after the user has typed something, to avoid yelling on empty load.
   useEffect(() => {
     if (!local) {
       setPhoneError(null);
@@ -1121,8 +1288,6 @@ function CustomerStep() {
     setPhoneError(validatePhone(dial, local));
   }, [dial, local]);
 
-  // Quick-fix mode: pre-fill the local field with the expected format template
-  // (digits from the country example) so the user just has to overwrite each digit.
   const applyQuickFix = () => {
     const template = rule ? rule.example.replace(/\D/g, "") : "";
     setLocal(template);
@@ -1134,12 +1299,10 @@ function CustomerStep() {
     });
   };
 
-  // Auto-trigger quick-fix when arriving on this step from the recap with an invalid number.
   useEffect(() => {
     if (validatePhone(dial, local) !== null) {
       applyQuickFix();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const phoneInvalid = validatePhone(dial, local) !== null;
@@ -1153,103 +1316,193 @@ function CustomerStep() {
       phoneInputRef.current?.focus();
       return;
     }
+    if (showDriver) {
+      if (
+        !driver.licenseNumber ||
+        !driver.birthDate ||
+        !driver.address ||
+        !driver.city ||
+        !driver.postalCode
+      ) {
+        toast.error("Champs conducteur requis", {
+          description: "Veuillez remplir tous les champs du conducteur.",
+        });
+        return;
+      }
+    }
     const full = `${dial}${local}`;
     const next = { ...form, phone: full };
     setForm(next);
     dispatch({ type: "SET_CUSTOMER", value: next });
+    if (showDriver) {
+      dispatch({ type: "SET_DRIVER", value: driver });
+    }
     dispatch({ type: "GO", step: "recap" });
   };
 
+  const inpCls =
+    "w-full px-4 py-3 rounded-xl bg-white ring-1 ring-black/5 focus:ring-brand focus:outline-none text-base";
 
   return (
     <StepShell
       eyebrow="Vos coordonnées"
-      title="Quelques informations pour finaliser"
+      title="Informations client et conducteur"
+      description="Remplissez vos coordonnées et celles du conducteur principal."
       onBack={() => {
-        const back: StepId =
-          state.bookingType === "vehicle"
-            ? "vehicle-pick"
-            : "property-pick";
+        const back: StepId = state.bookingType === "vehicle" ? "vehicle-pick" : "property-pick";
         dispatch({ type: "GO", step: back });
       }}
     >
-      <form onSubmit={submit} className="space-y-5">
-        <Field label="Nom complet">
-          <input
-            required maxLength={120} value={form.name}
-            onChange={(e) => setForm({ ...form, name: e.target.value })}
-            className="w-full px-4 py-3 rounded-xl bg-white ring-1 ring-black/5 focus:ring-brand focus:outline-none"
-          />
-        </Field>
-        <div className="grid sm:grid-cols-2 gap-4">
-          <Field label="Email">
-            <input
-              required type="email" maxLength={200} value={form.email}
-              onChange={(e) => setForm({ ...form, email: e.target.value })}
-              className="w-full px-4 py-3 rounded-xl bg-white ring-1 ring-black/5 focus:ring-brand focus:outline-none"
-            />
-          </Field>
-          <Field label="Téléphone">
-            <div className="flex gap-2">
-              <select
-                value={dial}
-                onChange={(e) => {
-                  setDial(e.target.value);
-                  // live re-validation effect will recompute the error
-                }}
-                aria-label="Indicatif pays"
-                className="px-3 py-3 rounded-xl bg-white ring-1 ring-black/5 focus:ring-brand focus:outline-none text-sm"
-              >
-                {DIAL_CODES.map((d) => (
-                  <option key={d.code} value={d.code}>{d.label}</option>
-                ))}
-              </select>
+      <form onSubmit={submit} className="space-y-6">
+        <div className="bg-brand/5 rounded-2xl p-5 ring-1 ring-brand/15">
+          <h3 className="text-sm font-medium text-accent mb-4">Coordonnées</h3>
+          <div className="space-y-4">
+            <Field label="Nom complet">
               <input
-                ref={phoneInputRef}
                 required
-                type="tel"
-                inputMode="numeric"
-                pattern="[0-9]*"
-                maxLength={12}
-                value={local}
-                placeholder="690123456"
-                aria-invalid={phoneError ? true : undefined}
-                aria-describedby="phone-help"
-                onChange={(e) => {
-                  setLocal(e.target.value.replace(/\D/g, ""));
-                  if (phoneError) setPhoneError(null);
-                }}
-                className={`flex-1 min-w-0 px-4 py-3 rounded-xl bg-white ring-1 focus:outline-none ${
-                  phoneError ? "ring-red-500 focus:ring-red-500" : "ring-black/5 focus:ring-brand"
-                }`}
+                maxLength={120}
+                value={form.name}
+                onChange={(e) => setForm({ ...form, name: e.target.value })}
+                className={inpCls}
               />
+            </Field>
+            <div className="grid sm:grid-cols-2 gap-4">
+              <Field label="Email">
+                <input
+                  required
+                  type="email"
+                  maxLength={200}
+                  value={form.email}
+                  onChange={(e) => setForm({ ...form, email: e.target.value })}
+                  className={inpCls}
+                />
+              </Field>
+              <Field label="Téléphone">
+                <div className="flex gap-2">
+                  <select
+                    value={dial}
+                    onChange={(e) => setDial(e.target.value)}
+                    aria-label="Indicatif pays"
+                    className="px-3 py-3 rounded-xl bg-white ring-1 ring-black/5 focus:ring-brand focus:outline-none text-sm"
+                  >
+                    {DIAL_CODES.map((d) => (
+                      <option key={d.code} value={d.code}>
+                        {d.label}
+                      </option>
+                    ))}
+                  </select>
+                  <input
+                    ref={phoneInputRef}
+                    required
+                    type="tel"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    maxLength={12}
+                    value={local}
+                    placeholder="690123456"
+                    aria-invalid={phoneError || undefined}
+                    onChange={(e) => {
+                      setLocal(e.target.value.replace(/\D/g, ""));
+                      if (phoneError) setPhoneError(null);
+                    }}
+                    className={`flex-1 min-w-0 px-4 py-3 rounded-xl bg-white ring-1 focus:outline-none ${phoneError ? "ring-red-500 focus:ring-red-500" : "ring-black/5 focus:ring-brand"}`}
+                  />
+                </div>
+                {phoneError ? (
+                  <p className="mt-1 text-xs text-red-600">{phoneError}</p>
+                ) : (
+                  <p className="mt-1 text-xs text-neutral-500">{phoneExample}</p>
+                )}
+              </Field>
             </div>
-            {phoneError ? (
-              <div id="phone-help" className="mt-1.5 flex flex-wrap items-start justify-between gap-2">
-                <p className="text-xs text-red-600 flex-1 min-w-0">{phoneError}</p>
-                <button
-                  type="button"
-                  onClick={applyQuickFix}
-                  className="text-xs font-medium text-brand underline underline-offset-2 hover:text-accent shrink-0"
-                >
-                  Modifier mon numéro
-                </button>
-              </div>
-            ) : (
-              <p id="phone-help" className="mt-1 text-xs text-neutral-500">{phoneExample}</p>
+            {(state.bookingType === "vehicle" || state.bookingType === "both") && (
+              <Field label="N° de vol (optionnel)">
+                <input
+                  maxLength={80}
+                  value={form.flight}
+                  onChange={(e) => setForm({ ...form, flight: e.target.value })}
+                  className={inpCls}
+                />
+              </Field>
             )}
-          </Field>
+          </div>
         </div>
-        {(state.bookingType === "vehicle" || state.bookingType === "both") && (
-          <Field label="N° de vol (optionnel)">
-            <input
-              maxLength={80} value={form.flight}
-              onChange={(e) => setForm({ ...form, flight: e.target.value })}
-              className="w-full px-4 py-3 rounded-xl bg-white ring-1 ring-black/5 focus:ring-brand focus:outline-none"
-            />
-          </Field>
+
+        {showDriver && (
+          <div className="bg-accent/5 rounded-2xl p-5 ring-1 ring-accent/15">
+            <h3 className="text-sm font-medium text-accent mb-4">Conducteur principal</h3>
+            <p className="text-xs text-neutral-500 mb-4">
+              Permis de conduire valide obligatoire (21 ans minimum, permis B depuis 2 ans).
+            </p>
+            <div className="space-y-4">
+              <Field label="N° de permis de conduire">
+                <input
+                  required
+                  value={driver.licenseNumber}
+                  onChange={(e) => setDriver({ ...driver, licenseNumber: e.target.value })}
+                  className={inpCls}
+                  placeholder="Ex : 12345678901"
+                />
+              </Field>
+              <div className="grid sm:grid-cols-2 gap-4">
+                <Field label="Date de naissance">
+                  <input
+                    required
+                    type="date"
+                    value={driver.birthDate}
+                    onChange={(e) => setDriver({ ...driver, birthDate: e.target.value })}
+                    className={inpCls}
+                  />
+                </Field>
+                <Field label="Code postal">
+                  <input
+                    required
+                    maxLength={20}
+                    value={driver.postalCode}
+                    onChange={(e) => setDriver({ ...driver, postalCode: e.target.value })}
+                    className={inpCls}
+                    placeholder="Ex : 97100"
+                  />
+                </Field>
+              </div>
+              <Field label="Adresse">
+                <input
+                  required
+                  maxLength={200}
+                  value={driver.address}
+                  onChange={(e) => setDriver({ ...driver, address: e.target.value })}
+                  className={inpCls}
+                  placeholder="Numéro et rue"
+                />
+              </Field>
+              <div className="grid sm:grid-cols-2 gap-4">
+                <Field label="Ville">
+                  <input
+                    required
+                    maxLength={100}
+                    value={driver.city}
+                    onChange={(e) => setDriver({ ...driver, city: e.target.value })}
+                    className={inpCls}
+                    placeholder="Ex : Les Abymes"
+                  />
+                </Field>
+                <Field label="Pays">
+                  <input
+                    required
+                    maxLength={100}
+                    value={driver.country}
+                    onChange={(e) => setDriver({ ...driver, country: e.target.value })}
+                    className={inpCls}
+                  />
+                </Field>
+              </div>
+            </div>
+          </div>
         )}
-        <PrimaryButton disabled={phoneInvalid}>Récapitulatif</PrimaryButton>
+
+        <PrimaryButton disabled={phoneInvalid}>
+          {showDriver ? "Continuer vers le récapitulatif" : "Récapitulatif"}
+        </PrimaryButton>
       </form>
     </StepShell>
   );
@@ -1262,8 +1515,14 @@ function CustomerStep() {
 function RecapStep() {
   const { state, dispatch } = useBooking();
   const createFn = useServerFn(createBooking);
+  const paymentFn = useServerFn(createPaymentIntent);
+  const confirmPaymentFn = useServerFn(confirmPayment);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [stage, setStage] = useState<"review" | "paying" | "done">("review");
+  const [clientSecret, setClientSecret] = useState<string | null>(null);
+  const [paymentError, setPaymentError] = useState<string | null>(null);
+  const [bookingId, setBookingId] = useState<string | null>(null);
 
   const vehicleDays = (() => {
     if (!state.vehicle.startISO || !state.vehicle.endISO) return 0;
@@ -1286,211 +1545,282 @@ function RecapStep() {
     );
   })();
 
-  const vehicleTotal = (state.vehicle.pricePerDay ?? 0) * vehicleDays;
-  const propertyTotal = (state.property.pricePerNight ?? 0) * propertyNights;
+  const basePricePerDay = state.vehicle.pricePerDay ?? 0;
+  const basePricePerNight = state.property.pricePerNight ?? 0;
+  const vehicleTotal = basePricePerDay * vehicleDays;
+  const propertyTotal = basePricePerNight * propertyNights;
   const total = vehicleTotal + propertyTotal;
   const deposit = Math.round(total * DEPOSIT_RATIO * 100) / 100;
   const charged = state.paymentMode === "full" ? total : deposit;
 
-  const confirm = async () => {
+  const createBookingAndPay = async () => {
     setLoading(true);
     setError(null);
-    const loadingId = toast.loading("Confirmation de votre réservation…");
+    const loadingId = toast.loading("Création de votre réservation…");
     try {
-      const res = await createFn({
-        data: {
-          bookingType: state.bookingType!,
-          vehicleId: state.vehicle.vehicleId,
-          vehicleDates:
-            state.vehicle.startISO && state.vehicle.endISO && state.vehicle.pickupLocationId && state.vehicle.dropoffLocationId
-              ? {
-                  pickupLocationId: state.vehicle.pickupLocationId,
-                  dropoffLocationId: state.vehicle.dropoffLocationId,
-                  startISO: state.vehicle.startISO,
-                  endISO: state.vehicle.endISO,
-                }
-              : null,
-          propertyId: state.property.propertyId,
-          propertyDates:
-            state.property.checkin && state.property.checkout
-              ? {
-                  checkin: state.property.checkin,
-                  checkout: state.property.checkout,
-                  guests: state.property.guests,
-                }
-              : null,
-          customer: {
-            name: state.customer.name,
-            email: state.customer.email,
-            phone: state.customer.phone,
-            flight: state.customer.flight || null,
-          },
-          paymentMode: state.paymentMode,
+      const data = {
+        bookingType: state.bookingType!,
+        vehicleId: state.vehicle.vehicleId,
+        vehicleDates:
+          state.vehicle.startISO &&
+          state.vehicle.endISO &&
+          state.vehicle.pickupLocationId &&
+          state.vehicle.dropoffLocationId
+            ? {
+                pickupLocationId: state.vehicle.pickupLocationId,
+                dropoffLocationId: state.vehicle.dropoffLocationId,
+                startISO: state.vehicle.startISO,
+                endISO: state.vehicle.endISO,
+              }
+            : null,
+        propertyId: state.property.propertyId,
+        propertyDates:
+          state.property.checkin && state.property.checkout
+            ? {
+                checkin: state.property.checkin,
+                checkout: state.property.checkout,
+                guests: state.property.guests,
+              }
+            : null,
+        customer: {
+          name: state.customer.name,
+          email: state.customer.email,
+          phone: state.customer.phone,
+          flight: state.customer.flight || null,
         },
-      });
-      dispatch({ type: "SET_BOOKING_REF", value: res.reference });
-      toast.success("Réservation confirmée !", {
-        id: loadingId,
-        description: `Référence : ${res.reference}`,
-      });
+        driver: state.driver,
+        paymentMode: state.paymentMode,
+      };
+
+      const res = await createFn({ data });
+      setBookingId(res.bookingId);
+      dispatch({ type: "SET_BOOKING_RESULT", bookingRef: res.reference, bookingId: res.bookingId });
+
+      toast.success("Réservation créée !", { id: loadingId, description: `Réf. ${res.reference}` });
+      setStage("paying");
+
+      const pi = await paymentFn({ data: { bookingId: res.bookingId } });
+      setClientSecret(pi.clientSecret);
+      dispatch({ type: "SET_PAYMENT_INTENT", value: pi.paymentIntentId });
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Erreur inconnue";
       setError(msg);
-      toast.error("Échec de la réservation", { id: loadingId, description: msg });
-    } finally {
+      toast.error("Échec", { id: loadingId, description: msg });
       setLoading(false);
     }
   };
+
+  const onPaymentSuccess = async (paymentIntentId: string) => {
+    try {
+      await confirmPaymentFn({ data: { bookingId: bookingId!, paymentIntentId } });
+      dispatch({ type: "SET_PAYMENT_STATUS", value: "paid" });
+      setStage("done");
+      toast.success("Paiement confirmé !");
+    } catch (e) {
+      setPaymentError("Le paiement a réussi mais la confirmation a échoué. Contactez-nous.");
+    }
+  };
+
+  const Label = ({ c }: { c: string }) => (
+    <span className="text-xs uppercase tracking-widest text-neutral-400">{c}</span>
+  );
+  const Divider = () => <div className="border-t border-neutral-100" />;
 
   return (
     <StepShell
       eyebrow="Récapitulatif"
       title="Votre itinéraire"
-      description="Vérifiez les détails et choisissez votre mode de paiement."
+      description="Vérifiez les détails avant de payer."
       onBack={() => dispatch({ type: "GO", step: "customer" })}
     >
-      <div className="bg-white ring-1 ring-black/5 rounded-3xl p-8 space-y-6">
-        <div className="grid sm:grid-cols-2 gap-6 pb-6 border-b border-neutral-100">
-          <div>
-            <p className="text-xs uppercase tracking-widest text-neutral-400 mb-1">Client</p>
-            <p className="font-medium">{state.customer.name}</p>
-            <p className="text-sm text-neutral-500">{state.customer.email}</p>
-          </div>
-          <div>
-            <p className="text-xs uppercase tracking-widest text-neutral-400 mb-1">Téléphone</p>
-            {(() => {
-              const { dial, local } = splitPhone(state.customer.phone);
-              const phoneErr = validatePhone(dial, local);
-              if (phoneErr) {
-                return (
-                  <div className="rounded-lg bg-red-50 ring-1 ring-red-200 p-3">
-                    <p className="text-xs text-red-700">{phoneErr}</p>
-                    <button
-                      type="button"
-                      onClick={() => dispatch({ type: "GO", step: "customer" })}
-                      className="mt-2 text-xs font-medium text-red-700 underline underline-offset-2 hover:text-red-900"
-                    >
-                      Modifier mon numéro
-                    </button>
-                  </div>
-                );
-              }
-              return (
-                <>
-                  <p className="font-medium" title={formatPhonePretty(state.customer.phone)}>
-                    {maskPhonePretty(state.customer.phone)}
-                  </p>
-                  <p className="text-xs text-neutral-400 mt-0.5">Quelques chiffres sont masqués pour votre sécurité.</p>
-                  <button
-                    type="button"
-                    onClick={() => dispatch({ type: "GO", step: "customer" })}
-                    className="mt-1 text-xs font-medium text-brand underline underline-offset-2 hover:text-accent"
-                  >
-                    Modifier
-                  </button>
-                </>
-              );
-            })()}
-          </div>
-
+      <div className="bg-white ring-1 ring-black/5 rounded-3xl p-6 sm:p-8 space-y-6">
+        <div>
+          <Label c="Client" />
+          <p className="font-medium mt-1">{state.customer.name}</p>
+          <p className="text-sm text-neutral-500">{state.customer.email}</p>
+          <p className="text-sm text-neutral-500" title={formatPhonePretty(state.customer.phone)}>
+            {maskPhonePretty(state.customer.phone)}
+          </p>
         </div>
 
-        <div className="space-y-3">
+        {state.driver.licenseNumber && (
+          <div>
+            <Label c="Conducteur" />
+            <p className="text-sm text-neutral-600 mt-1">Permis : {state.driver.licenseNumber}</p>
+            <p className="text-sm text-neutral-600">
+              {state.driver.address}, {state.driver.postalCode} {state.driver.city}
+            </p>
+          </div>
+        )}
+
+        <Divider />
+
+        <div className="space-y-4">
           {vehicleTotal > 0 && (
-            <div className="flex justify-between">
-              <span className="text-neutral-600">
-                {state.vehicle.name} ({vehicleDays} jour{vehicleDays > 1 ? "s" : ""})
-              </span>
-              <span className="font-medium">{vehicleTotal}€</span>
+            <div>
+              <div className="flex justify-between items-start">
+                <div>
+                  <p className="font-medium">{state.vehicle.name}</p>
+                  <p className="text-xs text-neutral-500">
+                    {basePricePerDay}€ × {vehicleDays} jour{vehicleDays > 1 ? "s" : ""}
+                  </p>
+                </div>
+                <span className="font-medium">{vehicleTotal}€</span>
+              </div>
+              <div className="mt-2 flex flex-wrap gap-2">
+                <span className="text-[11px] bg-brand/10 text-brand px-2.5 py-1 rounded-full">
+                  Kilométrage illimité
+                </span>
+                <span className="text-[11px] bg-brand/10 text-brand px-2.5 py-1 rounded-full">
+                  Assurance tous risques
+                </span>
+                <span className="text-[11px] bg-brand/10 text-brand px-2.5 py-1 rounded-full">
+                  Climatisation
+                </span>
+              </div>
             </div>
           )}
           {propertyTotal > 0 && (
-            <div className="flex justify-between">
-              <span className="text-neutral-600">
-                {state.property.name} ({propertyNights} nuit{propertyNights > 1 ? "s" : ""})
-              </span>
-              <span className="font-medium">{propertyTotal}€</span>
+            <div>
+              <div className="flex justify-between items-start">
+                <div>
+                  <p className="font-medium">{state.property.name}</p>
+                  <p className="text-xs text-neutral-500">
+                    {basePricePerNight}€ × {propertyNights} nuit{propertyNights > 1 ? "s" : ""}
+                  </p>
+                </div>
+                <span className="font-medium">{propertyTotal}€</span>
+              </div>
+              <div className="mt-2 flex flex-wrap gap-2">
+                <span className="text-[11px] bg-brand/10 text-brand px-2.5 py-1 rounded-full">
+                  {state.property.guests} voyageurs
+                </span>
+              </div>
             </div>
           )}
         </div>
 
-        <div className="pt-6 border-t border-neutral-100 flex justify-between items-end">
-          <span className="text-lg font-serif">Total</span>
-          <span className="text-3xl font-serif text-accent">{total}€</span>
-        </div>
-      </div>
+        <Divider />
 
-      <fieldset className="mt-8 space-y-3">
-        <legend className="text-xs uppercase tracking-widest text-neutral-500 mb-2">
-          Mode de paiement
-        </legend>
-        <div className="grid sm:grid-cols-2 gap-3">
-          <PaymentChoice
-            selected={state.paymentMode === "deposit"}
-            onClick={() => dispatch({ type: "SET_PAYMENT_MODE", value: "deposit" })}
-            title="Acompte 30%"
-            sub={`Réservez avec ${deposit}€, solde sur place.`}
-          />
-          <PaymentChoice
-            selected={state.paymentMode === "full"}
-            onClick={() => dispatch({ type: "SET_PAYMENT_MODE", value: "full" })}
-            title="Paiement intégral"
-            sub={`Payez la totalité de ${total}€ en une fois.`}
-          />
-        </div>
-      </fieldset>
-
-      {error && <p className="mt-4 text-sm text-destructive">{error}</p>}
-
-      {(() => {
-        const { dial, local } = splitPhone(state.customer.phone);
-        const phoneInvalid = !!validatePhone(dial, local);
-        return (
-          <div className="mt-8 space-y-3">
-            <button
-              onClick={confirm}
-              disabled={loading || phoneInvalid}
-              title={phoneInvalid ? "Corrigez votre numéro de téléphone avant de confirmer." : undefined}
-              className="w-full py-4 bg-accent text-white rounded-full font-medium hover:bg-accent/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {loading
-                ? "Confirmation en cours…"
-                : phoneInvalid
-                  ? "Téléphone invalide — corrigez pour continuer"
-                  : `Confirmer ma réservation · ${charged}€`}
-            </button>
-            {phoneInvalid && (
-              <button
-                type="button"
-                onClick={() => dispatch({ type: "GO", step: "customer" })}
-                className="w-full text-sm font-medium text-brand underline underline-offset-2 hover:text-accent"
-              >
-                Modifier mon numéro de téléphone
-              </button>
-            )}
+        <div className="space-y-2">
+          <div className="flex justify-between text-sm">
+            <span className="text-neutral-500">Sous-total</span>
+            <span>{total}€</span>
           </div>
-        );
-      })()}
-      <div className="mt-3">
-        <p className="text-[11px] text-center text-neutral-400 max-w-[48ch] mx-auto">
-          Votre réservation sera confirmée. Le paiement sécurisé en ligne sera activé prochainement —
-          en attendant nous vous contacterons par email pour finaliser le règlement.
-        </p>
+          <div className="flex justify-between text-sm">
+            <span className="text-neutral-500">Acompte (30%)</span>
+            <span>{deposit}€</span>
+          </div>
+          <div className="flex justify-between text-sm">
+            <span className="text-neutral-500">Solde à payer sur place</span>
+            <span>{Math.round((total - deposit) * 100) / 100}€</span>
+          </div>
+          <div className="flex justify-between text-lg font-serif pt-2 border-t border-neutral-100">
+            <span className="text-accent">
+              {state.paymentMode === "full" ? "Total dû" : "Total à payer maintenant"}
+            </span>
+            <span className="text-accent font-medium">{charged}€</span>
+          </div>
+        </div>
       </div>
+
+      {stage === "review" && (
+        <div className="mt-8 space-y-4">
+          <fieldset className="space-y-3">
+            <legend className="text-xs uppercase tracking-widest text-neutral-500 mb-2">
+              Mode de paiement
+            </legend>
+            <div className="grid sm:grid-cols-2 gap-3">
+              <PaymentChoice
+                selected={state.paymentMode === "deposit"}
+                onClick={() => dispatch({ type: "SET_PAYMENT_MODE", value: "deposit" })}
+                title="Acompte 30%"
+                sub={`Payez ${deposit}€ aujourd'hui, solde sur place.`}
+              />
+              <PaymentChoice
+                selected={state.paymentMode === "full"}
+                onClick={() => dispatch({ type: "SET_PAYMENT_MODE", value: "full" })}
+                title="Paiement intégral"
+                sub={`Payez la totalité de ${total}€ en une fois.`}
+              />
+            </div>
+          </fieldset>
+
+          {error && <p className="text-sm text-destructive">{error}</p>}
+
+          {(() => {
+            const { dial, local } = splitPhone(state.customer.phone);
+            const phoneInvalid = !!validatePhone(dial, local);
+            return (
+              <button
+                onClick={createBookingAndPay}
+                disabled={loading || phoneInvalid}
+                className="w-full py-4 bg-accent text-white rounded-full font-medium hover:bg-accent/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {loading ? "Création en cours…" : `Confirmer et payer · ${charged}€`}
+              </button>
+            );
+          })()}
+        </div>
+      )}
+
+      {stage === "paying" && clientSecret && (
+        <div className="mt-8 bg-white ring-1 ring-black/5 rounded-3xl p-6 sm:p-8">
+          <h3 className="text-sm font-medium mb-4">Paiement sécurisé</h3>
+          <StripeWrapper clientSecret={clientSecret}>
+            <StripePaymentForm
+              clientSecret={clientSecret}
+              onSuccess={onPaymentSuccess}
+              onError={(msg) => {
+                setPaymentError(msg);
+                setLoading(false);
+              }}
+            />
+          </StripeWrapper>
+          {paymentError && <p className="mt-3 text-sm text-destructive">{paymentError}</p>}
+        </div>
+      )}
+
+      {stage === "done" && (
+        <div className="mt-8 text-center">
+          <div className="size-16 mx-auto bg-green-100 rounded-full flex items-center justify-center mb-4">
+            <svg
+              className="size-8 text-green-600"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M5 13l4 4L19 7"
+              />
+            </svg>
+          </div>
+          <p className="text-lg font-medium text-green-700">Paiement confirmé</p>
+        </div>
+      )}
     </StepShell>
   );
 }
 
-function PaymentChoice({ selected, onClick, title, sub }: {
-  selected: boolean; onClick: () => void; title: string; sub: string;
+function PaymentChoice({
+  selected,
+  onClick,
+  title,
+  sub,
+}: {
+  selected: boolean;
+  onClick: () => void;
+  title: string;
+  sub: string;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className={`p-5 text-left rounded-xl ring-1 transition-all ${
-        selected ? "bg-accent text-white ring-accent" : "bg-white ring-black/5 hover:ring-brand/40"
-      }`}
+      className={`p-5 text-left rounded-xl ring-1 transition-all ${selected ? "bg-accent text-white ring-accent" : "bg-white ring-black/5 hover:ring-brand/40"}`}
     >
       <div className="font-medium mb-1">{title}</div>
       <div className={`text-xs ${selected ? "text-white/70" : "text-neutral-500"}`}>{sub}</div>
@@ -1504,26 +1834,155 @@ function PaymentChoice({ selected, onClick, title, sub }: {
 
 function ConfirmationStep() {
   const { state, dispatch } = useBooking();
+  const vehicleDays = (() => {
+    if (!state.vehicle.startISO || !state.vehicle.endISO) return 0;
+    return Math.max(
+      1,
+      Math.ceil(
+        (new Date(state.vehicle.endISO).getTime() - new Date(state.vehicle.startISO).getTime()) /
+          (1000 * 60 * 60 * 24),
+      ),
+    );
+  })();
+  const propertyNights = (() => {
+    if (!state.property.checkin || !state.property.checkout) return 0;
+    return Math.max(
+      1,
+      Math.ceil(
+        (new Date(state.property.checkout).getTime() - new Date(state.property.checkin).getTime()) /
+          (1000 * 60 * 60 * 24),
+      ),
+    );
+  })();
+  const vehicleTotal = (state.vehicle.pricePerDay ?? 0) * vehicleDays;
+  const propertyTotal = (state.property.pricePerNight ?? 0) * propertyNights;
+  const total = vehicleTotal + propertyTotal;
+  const deposit = Math.round(total * DEPOSIT_RATIO * 100) / 100;
+
+  const downloadPdf = () => {
+    generateReceiptPdf({
+      reference: state.bookingRef ?? "",
+      customerName: state.customer.name,
+      customerEmail: state.customer.email,
+      vehicle:
+        vehicleTotal > 0
+          ? { name: state.vehicle.name ?? "", days: vehicleDays, total: vehicleTotal }
+          : undefined,
+      property:
+        propertyTotal > 0
+          ? { name: state.property.name ?? "", nights: propertyNights, total: propertyTotal }
+          : undefined,
+      totalAmount: total,
+      depositAmount: deposit,
+      paymentMode: state.paymentMode,
+      amountCharged: state.paymentMode === "full" ? total : deposit,
+      paidAt: new Date().toLocaleDateString("fr-FR"),
+    });
+  };
+
   return (
     <StepShell
       eyebrow="Confirmation"
-      title="Merci, votre demande est enregistrée"
-      description={`Référence de réservation : ${state.bookingRef}. Vous recevrez un email à ${state.customer.email} avec les détails.`}
-      onBack={() => dispatch({ type: "GO", step: "recap" })}
+      title={state.paymentStatus === "paid" ? "Paiement confirmé !" : "Réservation enregistrée"}
+      description={`Référence : ${state.bookingRef}. Un email récapitulatif a été envoyé à ${state.customer.email}.`}
     >
-      <div className="bg-white ring-1 ring-black/5 rounded-3xl p-8">
-        <p className="text-sm text-neutral-600 leading-relaxed">
-          Notre équipe revient vers vous sous peu pour finaliser le paiement et organiser
-          votre prise en charge. Pour toute question, contactez-nous directement par email
-          ou téléphone.
-        </p>
+      <div className="bg-white ring-1 ring-black/5 rounded-3xl p-6 sm:p-8 space-y-4">
+        {state.paymentStatus === "paid" ? (
+          <div className="flex items-start gap-4 p-4 bg-green-50 rounded-2xl ring-1 ring-green-200">
+            <div className="size-10 shrink-0 bg-green-100 rounded-full flex items-center justify-center">
+              <svg
+                className="size-5 text-green-600"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M5 13l4 4L19 7"
+                />
+              </svg>
+            </div>
+            <div>
+              <p className="font-medium text-green-800">Paiement accepté</p>
+              <p className="text-sm text-green-700">
+                Votre réservation est confirmée et votre place est garantie.
+              </p>
+            </div>
+          </div>
+        ) : (
+          <div className="flex items-start gap-4 p-4 bg-amber-50 rounded-2xl ring-1 ring-amber-200">
+            <div className="size-10 shrink-0 bg-amber-100 rounded-full flex items-center justify-center">
+              <svg
+                className="size-5 text-amber-600"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z"
+                />
+              </svg>
+            </div>
+            <div>
+              <p className="font-medium text-amber-800">En attente de paiement</p>
+              <p className="text-sm text-amber-700">
+                Votre réservation expire sous 15 minutes. Finalisez le paiement pour confirmer.
+              </p>
+            </div>
+          </div>
+        )}
+
+        <div className="border-t border-neutral-100 pt-4 space-y-2 text-sm">
+          {vehicleTotal > 0 && (
+            <div className="flex justify-between">
+              <span className="text-neutral-600">
+                {state.vehicle.name} · {vehicleDays} jour{vehicleDays > 1 ? "s" : ""}
+              </span>
+              <span className="font-medium">{vehicleTotal}€</span>
+            </div>
+          )}
+          {propertyTotal > 0 && (
+            <div className="flex justify-between">
+              <span className="text-neutral-600">
+                {state.property.name} · {propertyNights} nuit{propertyNights > 1 ? "s" : ""}
+              </span>
+              <span className="font-medium">{propertyTotal}€</span>
+            </div>
+          )}
+          <div className="border-t border-neutral-100 pt-2 flex justify-between font-medium">
+            <span>Total</span>
+            <span>{total}€</span>
+          </div>
+        </div>
       </div>
-      <button
-        onClick={() => dispatch({ type: "RESET" })}
-        className="mt-8 text-sm text-brand hover:underline"
-      >
-        Faire une nouvelle réservation
-      </button>
+
+      <div className="mt-8 flex flex-col sm:flex-row gap-3">
+        <button
+          onClick={downloadPdf}
+          className="flex-1 py-3.5 px-6 bg-accent text-white rounded-full font-medium hover:bg-accent/90 transition-colors inline-flex items-center justify-center gap-2"
+        >
+          <svg className="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+            />
+          </svg>
+          Télécharger le récapitulatif (PDF)
+        </button>
+        <button
+          onClick={() => dispatch({ type: "RESET" })}
+          className="flex-1 py-3.5 px-6 bg-white text-neutral-700 rounded-full font-medium ring-1 ring-black/10 hover:bg-neutral-50 transition-colors"
+        >
+          Nouvelle réservation
+        </button>
+      </div>
     </StepShell>
   );
 }
@@ -1563,9 +2022,7 @@ function Footer() {
             Routh Location
           </span>
         </div>
-        <p className="text-xs text-neutral-400">
-          Location voiture & logement · Guadeloupe
-        </p>
+        <p className="text-xs text-neutral-400">Location voiture & logement · Guadeloupe</p>
       </div>
     </footer>
   );
