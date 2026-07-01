@@ -1337,6 +1337,12 @@ function CustomerStep() {
         });
         return;
       }
+      if (!consentLicense || !consentDeposit || !consentTerms) {
+        toast.error("Consentements requis", {
+          description: "Veuillez valider les conditions de location avant de continuer.",
+        });
+        return;
+      }
     }
     const full = `${dial}${local}`;
     const next = { ...form, phone: full };
@@ -1345,6 +1351,7 @@ function CustomerStep() {
     if (showDriver) {
       dispatch({ type: "SET_DRIVER", value: driver });
     }
+
     dispatch({ type: "GO", step: "recap" });
   };
 
