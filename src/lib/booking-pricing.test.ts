@@ -13,6 +13,16 @@ const baseCustomer = {
   flight: null,
 };
 
+const baseDriver = {
+  licenseNumber: "12345678901",
+  birthDate: "1990-01-01",
+  address: "1 rue de la Plage",
+  city: "Les Abymes",
+  postalCode: "97139",
+  country: "Guadeloupe",
+};
+
+
 function vehicleOnlyInput(overrides: Partial<CreateBookingInput> = {}): CreateBookingInput {
   return {
     bookingType: "vehicle",
@@ -26,6 +36,7 @@ function vehicleOnlyInput(overrides: Partial<CreateBookingInput> = {}): CreateBo
     propertyId: null,
     propertyDates: null,
     customer: baseCustomer,
+    driver: baseDriver,
     paymentMode: "full",
     ...overrides,
   };
@@ -43,6 +54,7 @@ function propertyOnlyInput(overrides: Partial<CreateBookingInput> = {}): CreateB
       guests: 2,
     },
     customer: baseCustomer,
+    driver: baseDriver,
     paymentMode: "full",
     ...overrides,
   };
@@ -204,6 +216,7 @@ describe("computeBookingPlan — vehicle + property", () => {
       propertyId: null,
       propertyDates: null,
       customer: baseCustomer,
+    driver: baseDriver,
       paymentMode: "full",
     };
     expect(() => computeBookingPlan(empty, null, null)).toThrow(/Sélection vide/);

@@ -1,5 +1,5 @@
 import { createFileRoute, useSearch } from "@tanstack/react-router";
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { Bath, BedDouble, DoorClosed } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
@@ -1262,7 +1262,95 @@ function maskPhonePretty(full: string): string {
   return `${dial} ${[head, ...rest].join(" ")}`.trim();
 }
 
+type UploadedDoc = {
+  name: string;
+  size: number;
+  type: string;
+  previewUrl: string;
+};
+
+const MAX_UPLOAD_BYTES = 5 * 1024 * 1024; // 5 MB
+const ACCEPTED_UPLOAD_TYPES = ["image/jpeg", "image/png", "image/webp", "application/pdf"];
+
+function validateUpload(file: File): string | null {
+  if (!ACCEPTED_UPLOAD_TYPES.includes(file.type)) {
+    return "Format non supporté. Utilisez JPG, PNG, WEBP ou PDF.";
+  }
+  if (file.size > MAX_UPLOAD_BYTES) {
+    return `Fichier trop volumineux (${(file.size / 1024 / 1024).toFixed(1)} Mo). Max 5 Mo.`;
+  }
+  return null;
+}
+
+function ageInYears(birthDateISO: string): number | null {
+  const d = new Date(birthDateISO);
+  if (isNaN(d.getTime())) return null;
+  const now = new Date();
+  let age = now.getFullYear() - d.getFullYear();
+  const m = now.getMonth() - d.getMonth();
+  if (m < 0 || (m === 0 && now.getDate() < d.getDate())) age--;
+  return age;
+}
+
+function DocUploadField({
+  label,
+  doc,
+  onChange,
+  onClear,
+}: {
+  label: string;
+  doc: UploadedDoc | null;
+  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  onClear: () => void;
+}) {
+  const inputId = `upload-${label.replace(/\s+/g, "-").toLowerCase()}`;
+  return (
+    <div>
+      <label htmlFor={inputId} className="text-sm text-neutral-700 mb-2 block">
+        {label}
+      </label>
+      {doc ? (
+        <div className="flex items-center gap-3 p-3 rounded-xl bg-neutral-50 ring-1 ring-black/5">
+          {doc.type.startsWith("image/") ? (
+            <img
+              src={doc.previewUrl}
+              alt={doc.name}
+              className="w-14 h-14 rounded-lg object-cover ring-1 ring-black/10"
+            />
+          ) : (
+            <div className="w-14 h-14 rounded-lg bg-white ring-1 ring-black/10 flex items-center justify-center text-xs text-neutral-500">
+              PDF
+            </div>
+          )}
+          <div className="flex-1 min-w-0">
+            <p className="text-sm truncate">{doc.name}</p>
+            <p className="text-xs text-neutral-500">{(doc.size / 1024).toFixed(0)} Ko</p>
+          </div>
+          <button
+            type="button"
+            onClick={onClear}
+            className="text-xs text-red-600 hover:underline"
+          >
+            Retirer
+          </button>
+        </div>
+      ) : (
+        <input
+          id={inputId}
+          type="file"
+          accept="image/jpeg,image/png,image/webp,application/pdf"
+          onChange={onChange}
+          className="block w-full text-sm text-neutral-600 file:mr-3 file:py-2 file:px-4 file:rounded-full file:border-0 file:bg-brand/10 file:text-brand file:font-medium hover:file:bg-brand/20 cursor-pointer"
+        />
+      )}
+    </div>
+  );
+}
+
+
+
 function CustomerStep() {
+
   const { state, dispatch } = useBooking();
   const initial = splitPhone(state.customer.phone || "+590");
   const [form, setForm] = useState(state.customer);
@@ -1277,10 +1365,15 @@ function CustomerStep() {
   const [secondDriver, setSecondDriver] = useState(false);
   const [secondDriverName, setSecondDriverName] = useState("");
   const [secondDriverLicense, setSecondDriverLicense] = useState("");
+  const [secondDriverBirth, setSecondDriverBirth] = useState("");
   const [consentLicense, setConsentLicense] = useState(false);
   const [consentDeposit, setConsentDeposit] = useState(false);
   const [consentTerms, setConsentTerms] = useState(false);
-  const consentsMissing = showDriver && (!consentLicense || !consentDeposit || !consentTerms);
+  const [licenseFile, setLicenseFile] = useState<UploadedDoc | null>(null);
+  const [idFile, setIdFile] = useState<UploadedDoc | null>(null);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [showErrors, setShowErrors] = useState(false);
+
 
 
   const rule = PHONE_RULES[dial];
@@ -1315,34 +1408,50 @@ function CustomerStep() {
 
   const phoneInvalid = validatePhone(dial, local) !== null;
 
+  // Strict validation — build a list of errors so we can show them above the button.
+  const errors: string[] = [];
+  if (!form.name.trim()) errors.push("Nom complet requis.");
+  if (!form.email.trim()) errors.push("Email requis.");
+  const phoneErr = validatePhone(dial, local);
+  if (phoneErr) errors.push(`Téléphone : ${phoneErr}`);
+  if (showDriver) {
+    if (!driver.licenseNumber.trim()) errors.push("Numéro de permis requis.");
+    if (!driver.birthDate) {
+      errors.push("Date de naissance requise.");
+    } else {
+      const age = ageInYears(driver.birthDate);
+      if (age !== null && age < 21) errors.push("Le conducteur doit avoir au moins 21 ans.");
+    }
+    if (!driver.address.trim()) errors.push("Adresse requise.");
+    if (!driver.city.trim()) errors.push("Ville requise.");
+    if (!driver.postalCode.trim()) errors.push("Code postal requis.");
+    if (!licenseFile) errors.push("Photo du permis de conduire requise.");
+    if (!idFile) errors.push("Pièce d'identité requise.");
+    if (secondDriver) {
+      if (!secondDriverName.trim()) errors.push("Nom du second conducteur requis.");
+      if (!secondDriverLicense.trim()) errors.push("Permis du second conducteur requis.");
+      if (!secondDriverBirth) {
+        errors.push("Date de naissance du second conducteur requise.");
+      } else {
+        const age2 = ageInYears(secondDriverBirth);
+        if (age2 !== null && age2 < 21)
+          errors.push("Le second conducteur doit avoir au moins 21 ans.");
+      }
+    }
+    if (!consentLicense) errors.push("Confirmation du permis valide requise.");
+    if (!consentDeposit) errors.push("Acceptation de la caution requise.");
+    if (!consentTerms) errors.push("Acceptation des CGL requise.");
+  }
+  const hasErrors = errors.length > 0;
+
   const submit = (e: FormEvent) => {
     e.preventDefault();
-    const err = validatePhone(dial, local);
-    if (err) {
-      setPhoneError(err);
-      toast.error("Numéro de téléphone invalide", { description: err });
-      phoneInputRef.current?.focus();
+    if (hasErrors) {
+      setShowErrors(true);
+      toast.error("Formulaire incomplet", {
+        description: `${errors.length} champ(s) à corriger.`,
+      });
       return;
-    }
-    if (showDriver) {
-      if (
-        !driver.licenseNumber ||
-        !driver.birthDate ||
-        !driver.address ||
-        !driver.city ||
-        !driver.postalCode
-      ) {
-        toast.error("Champs conducteur requis", {
-          description: "Veuillez remplir tous les champs du conducteur.",
-        });
-        return;
-      }
-      if (!consentLicense || !consentDeposit || !consentTerms) {
-        toast.error("Consentements requis", {
-          description: "Veuillez valider les conditions de location avant de continuer.",
-        });
-        return;
-      }
     }
     const full = `${dial}${local}`;
     const next = { ...form, phone: full };
@@ -1354,6 +1463,27 @@ function CustomerStep() {
 
     dispatch({ type: "GO", step: "recap" });
   };
+
+  const handleUpload =
+    (setter: (doc: UploadedDoc | null) => void) => (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      const err = validateUpload(file);
+      if (err) {
+        setUploadError(err);
+        toast.error("Document refusé", { description: err });
+        e.target.value = "";
+        return;
+      }
+      setUploadError(null);
+      setter({
+        name: file.name,
+        size: file.size,
+        type: file.type,
+        previewUrl: URL.createObjectURL(file),
+      });
+    };
+
 
   const inpCls =
     "w-full px-4 py-3 rounded-xl bg-white ring-1 ring-black/5 focus:ring-brand focus:outline-none text-base";
@@ -1415,7 +1545,7 @@ function CustomerStep() {
                     maxLength={12}
                     value={local}
                     placeholder="690123456"
-                    aria-invalid={phoneError || undefined}
+                    aria-invalid={phoneError ? true : undefined}
                     onChange={(e) => {
                       setLocal(e.target.value.replace(/\D/g, ""));
                       if (phoneError) setPhoneError(null);
@@ -1527,6 +1657,34 @@ function CustomerStep() {
               </ul>
             </div>
 
+            <div className="bg-white rounded-2xl p-5 ring-1 ring-black/5 space-y-4">
+              <div>
+                <h3 className="text-sm font-medium text-accent">Téléverser vos documents</h3>
+                <p className="text-xs text-neutral-500 mt-1">
+                  Formats acceptés : JPG, PNG, WEBP, PDF — max 5 Mo par fichier.
+                </p>
+              </div>
+
+              <DocUploadField
+                label="Permis de conduire"
+                doc={licenseFile}
+                onChange={handleUpload(setLicenseFile)}
+                onClear={() => setLicenseFile(null)}
+              />
+              <DocUploadField
+                label="Pièce d'identité (CNI ou passeport)"
+                doc={idFile}
+                onChange={handleUpload(setIdFile)}
+                onClear={() => setIdFile(null)}
+              />
+
+              {uploadError && (
+                <p className="text-xs text-red-600" role="alert">
+                  {uploadError}
+                </p>
+              )}
+            </div>
+
             <div className="bg-white rounded-2xl p-5 ring-1 ring-black/5">
               <div className="flex items-center justify-between mb-3">
                 <h3 className="text-sm font-medium text-accent">Conducteur additionnel (optionnel)</h3>
@@ -1541,29 +1699,37 @@ function CustomerStep() {
                 </label>
               </div>
               {secondDriver && (
-                <div className="grid sm:grid-cols-2 gap-4">
-                  <Field label="Nom complet">
+                <div className="space-y-4">
+                  <div className="grid sm:grid-cols-2 gap-4">
+                    <Field label="Nom complet">
+                      <input
+                        maxLength={120}
+                        value={secondDriverName}
+                        onChange={(e) => setSecondDriverName(e.target.value)}
+                        className={inpCls}
+                      />
+                    </Field>
+                    <Field label="N° de permis">
+                      <input
+                        maxLength={40}
+                        value={secondDriverLicense}
+                        onChange={(e) => setSecondDriverLicense(e.target.value)}
+                        className={inpCls}
+                      />
+                    </Field>
+                  </div>
+                  <Field label="Date de naissance">
                     <input
-                      maxLength={120}
-                      value={secondDriverName}
-                      onChange={(e) => setSecondDriverName(e.target.value)}
+                      type="date"
+                      value={secondDriverBirth}
+                      onChange={(e) => setSecondDriverBirth(e.target.value)}
                       className={inpCls}
                     />
                   </Field>
-                  <Field label="N° de permis">
-                    <input
-                      maxLength={40}
-                      value={secondDriverLicense}
-                      onChange={(e) => setSecondDriverLicense(e.target.value)}
-                      className={inpCls}
-                    />
-                  </Field>
+                  <p className="text-xs text-neutral-500">
+                    Le second conducteur devra présenter ses documents lors de la remise du véhicule.
+                  </p>
                 </div>
-              )}
-              {secondDriver && (
-                <p className="mt-3 text-xs text-neutral-500">
-                  Le second conducteur devra présenter ses documents lors de la remise du véhicule.
-                </p>
               )}
             </div>
 
@@ -1600,9 +1766,25 @@ function CustomerStep() {
           </>
         )}
 
-        <PrimaryButton disabled={phoneInvalid || consentsMissing}>
+        {showErrors && hasErrors && (
+          <div
+            role="alert"
+            className="rounded-2xl p-4 bg-red-50 ring-1 ring-red-200 text-sm text-red-800"
+          >
+            <p className="font-medium mb-2">Corrigez les points suivants avant de continuer :</p>
+            <ul className="list-disc pl-5 space-y-1">
+              {errors.map((msg) => (
+                <li key={msg}>{msg}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        <PrimaryButton disabled={phoneInvalid}>
           {showDriver ? "Continuer vers le récapitulatif" : "Récapitulatif"}
         </PrimaryButton>
+
+
 
       </form>
     </StepShell>
