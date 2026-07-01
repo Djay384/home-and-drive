@@ -13,6 +13,16 @@ const baseCustomer = {
   flight: null,
 };
 
+const baseDriver = {
+  licenseNumber: "12345678901",
+  birthDate: "1990-01-01",
+  address: "1 rue de la Plage",
+  city: "Les Abymes",
+  postalCode: "97139",
+  country: "Guadeloupe",
+};
+
+
 function vehicleOnlyInput(overrides: Partial<CreateBookingInput> = {}): CreateBookingInput {
   return {
     bookingType: "vehicle",
