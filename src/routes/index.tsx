@@ -1600,6 +1600,34 @@ function CustomerStep() {
               </ul>
             </div>
 
+            <div className="bg-white rounded-2xl p-5 ring-1 ring-black/5 space-y-4">
+              <div>
+                <h3 className="text-sm font-medium text-accent">Téléverser vos documents</h3>
+                <p className="text-xs text-neutral-500 mt-1">
+                  Formats acceptés : JPG, PNG, WEBP, PDF — max 5 Mo par fichier.
+                </p>
+              </div>
+
+              <DocUploadField
+                label="Permis de conduire"
+                doc={licenseFile}
+                onChange={handleUpload(setLicenseFile)}
+                onClear={() => setLicenseFile(null)}
+              />
+              <DocUploadField
+                label="Pièce d'identité (CNI ou passeport)"
+                doc={idFile}
+                onChange={handleUpload(setIdFile)}
+                onClear={() => setIdFile(null)}
+              />
+
+              {uploadError && (
+                <p className="text-xs text-red-600" role="alert">
+                  {uploadError}
+                </p>
+              )}
+            </div>
+
             <div className="bg-white rounded-2xl p-5 ring-1 ring-black/5">
               <div className="flex items-center justify-between mb-3">
                 <h3 className="text-sm font-medium text-accent">Conducteur additionnel (optionnel)</h3>
@@ -1614,29 +1642,37 @@ function CustomerStep() {
                 </label>
               </div>
               {secondDriver && (
-                <div className="grid sm:grid-cols-2 gap-4">
-                  <Field label="Nom complet">
+                <div className="space-y-4">
+                  <div className="grid sm:grid-cols-2 gap-4">
+                    <Field label="Nom complet">
+                      <input
+                        maxLength={120}
+                        value={secondDriverName}
+                        onChange={(e) => setSecondDriverName(e.target.value)}
+                        className={inpCls}
+                      />
+                    </Field>
+                    <Field label="N° de permis">
+                      <input
+                        maxLength={40}
+                        value={secondDriverLicense}
+                        onChange={(e) => setSecondDriverLicense(e.target.value)}
+                        className={inpCls}
+                      />
+                    </Field>
+                  </div>
+                  <Field label="Date de naissance">
                     <input
-                      maxLength={120}
-                      value={secondDriverName}
-                      onChange={(e) => setSecondDriverName(e.target.value)}
+                      type="date"
+                      value={secondDriverBirth}
+                      onChange={(e) => setSecondDriverBirth(e.target.value)}
                       className={inpCls}
                     />
                   </Field>
-                  <Field label="N° de permis">
-                    <input
-                      maxLength={40}
-                      value={secondDriverLicense}
-                      onChange={(e) => setSecondDriverLicense(e.target.value)}
-                      className={inpCls}
-                    />
-                  </Field>
+                  <p className="text-xs text-neutral-500">
+                    Le second conducteur devra présenter ses documents lors de la remise du véhicule.
+                  </p>
                 </div>
-              )}
-              {secondDriver && (
-                <p className="mt-3 text-xs text-neutral-500">
-                  Le second conducteur devra présenter ses documents lors de la remise du véhicule.
-                </p>
               )}
             </div>
 
@@ -1673,9 +1709,25 @@ function CustomerStep() {
           </>
         )}
 
-        <PrimaryButton disabled={phoneInvalid || consentsMissing}>
+        {showErrors && hasErrors && (
+          <div
+            role="alert"
+            className="rounded-2xl p-4 bg-red-50 ring-1 ring-red-200 text-sm text-red-800"
+          >
+            <p className="font-medium mb-2">Corrigez les points suivants avant de continuer :</p>
+            <ul className="list-disc pl-5 space-y-1">
+              {errors.map((msg) => (
+                <li key={msg}>{msg}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        <PrimaryButton disabled={phoneInvalid}>
           {showDriver ? "Continuer vers le récapitulatif" : "Récapitulatif"}
         </PrimaryButton>
+
+
 
       </form>
     </StepShell>
