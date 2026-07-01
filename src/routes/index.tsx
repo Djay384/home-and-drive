@@ -1262,7 +1262,38 @@ function maskPhonePretty(full: string): string {
   return `${dial} ${[head, ...rest].join(" ")}`.trim();
 }
 
+type UploadedDoc = {
+  name: string;
+  size: number;
+  type: string;
+  previewUrl: string;
+};
+
+const MAX_UPLOAD_BYTES = 5 * 1024 * 1024; // 5 MB
+const ACCEPTED_UPLOAD_TYPES = ["image/jpeg", "image/png", "image/webp", "application/pdf"];
+
+function validateUpload(file: File): string | null {
+  if (!ACCEPTED_UPLOAD_TYPES.includes(file.type)) {
+    return "Format non supporté. Utilisez JPG, PNG, WEBP ou PDF.";
+  }
+  if (file.size > MAX_UPLOAD_BYTES) {
+    return `Fichier trop volumineux (${(file.size / 1024 / 1024).toFixed(1)} Mo). Max 5 Mo.`;
+  }
+  return null;
+}
+
+function ageInYears(birthDateISO: string): number | null {
+  const d = new Date(birthDateISO);
+  if (isNaN(d.getTime())) return null;
+  const now = new Date();
+  let age = now.getFullYear() - d.getFullYear();
+  const m = now.getMonth() - d.getMonth();
+  if (m < 0 || (m === 0 && now.getDate() < d.getDate())) age--;
+  return age;
+}
+
 function CustomerStep() {
+
   const { state, dispatch } = useBooking();
   const initial = splitPhone(state.customer.phone || "+590");
   const [form, setForm] = useState(state.customer);
