@@ -1515,9 +1515,95 @@ function CustomerStep() {
           </div>
         )}
 
-        <PrimaryButton disabled={phoneInvalid}>
+        {showDriver && (
+          <>
+            <div className="bg-white rounded-2xl p-5 ring-1 ring-black/5">
+              <h3 className="text-sm font-medium text-accent mb-2">Documents à présenter au retrait</h3>
+              <ul className="text-sm text-neutral-700 space-y-1.5 list-disc pl-5">
+                <li>Permis de conduire original (recto/verso), valide depuis au moins 2 ans</li>
+                <li>Pièce d'identité en cours de validité (CNI ou passeport)</li>
+                <li>Carte bancaire au nom du conducteur (pour la caution)</li>
+                <li>Justificatif de domicile de moins de 3 mois</li>
+              </ul>
+            </div>
+
+            <div className="bg-white rounded-2xl p-5 ring-1 ring-black/5">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-medium text-accent">Conducteur additionnel (optionnel)</h3>
+                <label className="inline-flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={secondDriver}
+                    onChange={(e) => setSecondDriver(e.target.checked)}
+                    className="w-4 h-4 accent-brand"
+                  />
+                  Ajouter
+                </label>
+              </div>
+              {secondDriver && (
+                <div className="grid sm:grid-cols-2 gap-4">
+                  <Field label="Nom complet">
+                    <input
+                      maxLength={120}
+                      value={secondDriverName}
+                      onChange={(e) => setSecondDriverName(e.target.value)}
+                      className={inpCls}
+                    />
+                  </Field>
+                  <Field label="N° de permis">
+                    <input
+                      maxLength={40}
+                      value={secondDriverLicense}
+                      onChange={(e) => setSecondDriverLicense(e.target.value)}
+                      className={inpCls}
+                    />
+                  </Field>
+                </div>
+              )}
+              {secondDriver && (
+                <p className="mt-3 text-xs text-neutral-500">
+                  Le second conducteur devra présenter ses documents lors de la remise du véhicule.
+                </p>
+              )}
+            </div>
+
+            <div className="bg-white rounded-2xl p-5 ring-1 ring-black/5 space-y-3">
+              <h3 className="text-sm font-medium text-accent">Conditions de location</h3>
+              <label className="flex items-start gap-3 text-sm text-neutral-700 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={consentLicense}
+                  onChange={(e) => setConsentLicense(e.target.checked)}
+                  className="mt-1 w-4 h-4 accent-brand"
+                />
+                <span>Je certifie être titulaire d'un permis B valide depuis au moins 2 ans et être âgé de 21 ans ou plus.</span>
+              </label>
+              <label className="flex items-start gap-3 text-sm text-neutral-700 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={consentDeposit}
+                  onChange={(e) => setConsentDeposit(e.target.checked)}
+                  className="mt-1 w-4 h-4 accent-brand"
+                />
+                <span>J'accepte le dépôt d'une caution par empreinte bancaire au retrait du véhicule (montant selon la catégorie).</span>
+              </label>
+              <label className="flex items-start gap-3 text-sm text-neutral-700 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={consentTerms}
+                  onChange={(e) => setConsentTerms(e.target.checked)}
+                  className="mt-1 w-4 h-4 accent-brand"
+                />
+                <span>J'ai lu et j'accepte les conditions générales de location et la politique d'assurance.</span>
+              </label>
+            </div>
+          </>
+        )}
+
+        <PrimaryButton disabled={phoneInvalid || consentsMissing}>
           {showDriver ? "Continuer vers le récapitulatif" : "Récapitulatif"}
         </PrimaryButton>
+
       </form>
     </StepShell>
   );
