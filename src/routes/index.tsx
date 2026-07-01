@@ -1351,34 +1351,50 @@ function CustomerStep() {
 
   const phoneInvalid = validatePhone(dial, local) !== null;
 
+  // Strict validation — build a list of errors so we can show them above the button.
+  const errors: string[] = [];
+  if (!form.name.trim()) errors.push("Nom complet requis.");
+  if (!form.email.trim()) errors.push("Email requis.");
+  const phoneErr = validatePhone(dial, local);
+  if (phoneErr) errors.push(`Téléphone : ${phoneErr}`);
+  if (showDriver) {
+    if (!driver.licenseNumber.trim()) errors.push("Numéro de permis requis.");
+    if (!driver.birthDate) {
+      errors.push("Date de naissance requise.");
+    } else {
+      const age = ageInYears(driver.birthDate);
+      if (age !== null && age < 21) errors.push("Le conducteur doit avoir au moins 21 ans.");
+    }
+    if (!driver.address.trim()) errors.push("Adresse requise.");
+    if (!driver.city.trim()) errors.push("Ville requise.");
+    if (!driver.postalCode.trim()) errors.push("Code postal requis.");
+    if (!licenseFile) errors.push("Photo du permis de conduire requise.");
+    if (!idFile) errors.push("Pièce d'identité requise.");
+    if (secondDriver) {
+      if (!secondDriverName.trim()) errors.push("Nom du second conducteur requis.");
+      if (!secondDriverLicense.trim()) errors.push("Permis du second conducteur requis.");
+      if (!secondDriverBirth) {
+        errors.push("Date de naissance du second conducteur requise.");
+      } else {
+        const age2 = ageInYears(secondDriverBirth);
+        if (age2 !== null && age2 < 21)
+          errors.push("Le second conducteur doit avoir au moins 21 ans.");
+      }
+    }
+    if (!consentLicense) errors.push("Confirmation du permis valide requise.");
+    if (!consentDeposit) errors.push("Acceptation de la caution requise.");
+    if (!consentTerms) errors.push("Acceptation des CGL requise.");
+  }
+  const hasErrors = errors.length > 0;
+
   const submit = (e: FormEvent) => {
     e.preventDefault();
-    const err = validatePhone(dial, local);
-    if (err) {
-      setPhoneError(err);
-      toast.error("Numéro de téléphone invalide", { description: err });
-      phoneInputRef.current?.focus();
+    if (hasErrors) {
+      setShowErrors(true);
+      toast.error("Formulaire incomplet", {
+        description: `${errors.length} champ(s) à corriger.`,
+      });
       return;
-    }
-    if (showDriver) {
-      if (
-        !driver.licenseNumber ||
-        !driver.birthDate ||
-        !driver.address ||
-        !driver.city ||
-        !driver.postalCode
-      ) {
-        toast.error("Champs conducteur requis", {
-          description: "Veuillez remplir tous les champs du conducteur.",
-        });
-        return;
-      }
-      if (!consentLicense || !consentDeposit || !consentTerms) {
-        toast.error("Consentements requis", {
-          description: "Veuillez valider les conditions de location avant de continuer.",
-        });
-        return;
-      }
     }
     const full = `${dial}${local}`;
     const next = { ...form, phone: full };
@@ -1390,6 +1406,27 @@ function CustomerStep() {
 
     dispatch({ type: "GO", step: "recap" });
   };
+
+  const handleUpload =
+    (setter: (doc: UploadedDoc | null) => void) => (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      const err = validateUpload(file);
+      if (err) {
+        setUploadError(err);
+        toast.error("Document refusé", { description: err });
+        e.target.value = "";
+        return;
+      }
+      setUploadError(null);
+      setter({
+        name: file.name,
+        size: file.size,
+        type: file.type,
+        previewUrl: URL.createObjectURL(file),
+      });
+    };
+
 
   const inpCls =
     "w-full px-4 py-3 rounded-xl bg-white ring-1 ring-black/5 focus:ring-brand focus:outline-none text-base";
