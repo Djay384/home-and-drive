@@ -1415,7 +1415,7 @@ function CustomerStep() {
                     maxLength={12}
                     value={local}
                     placeholder="690123456"
-                    aria-invalid={phoneError || undefined}
+                    aria-invalid={phoneError ? true : undefined}
                     onChange={(e) => {
                       setLocal(e.target.value.replace(/\D/g, ""));
                       if (phoneError) setPhoneError(null);

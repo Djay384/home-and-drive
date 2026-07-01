@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
-import { createPaymentIntentSchema } from "./booking-schemas";
+import { confirmPaymentSchema, createPaymentIntentSchema } from "./booking-schemas";
+
 
 let _stripe: unknown = null;
 async function getStripe() {
@@ -53,8 +54,10 @@ export const createPaymentIntent = createServerFn({ method: "POST" })
     };
   });
 
-export const confirmPayment = createServerFn({ method: "POST" }).handler(
-  async ({ data }: { data: { bookingId: string; paymentIntentId: string } }) => {
+export const confirmPayment = createServerFn({ method: "POST" })
+  .inputValidator((input: unknown) => confirmPaymentSchema.parse(input))
+  .handler(async ({ data }) => {
+
     const { data: booking, error } = await supabaseAdmin
       .from("bookings")
       .select("id, stripe_payment_intent, amount_charged, payment_status")
@@ -82,8 +85,8 @@ export const confirmPayment = createServerFn({ method: "POST" }).handler(
       .eq("id", data.bookingId);
 
     return { success: true };
-  },
-);
+  });
+
 
 export const createCheckoutSession = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => createPaymentIntentSchema.parse(input))
