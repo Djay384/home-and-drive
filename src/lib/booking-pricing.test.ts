@@ -36,6 +36,7 @@ function vehicleOnlyInput(overrides: Partial<CreateBookingInput> = {}): CreateBo
     propertyId: null,
     propertyDates: null,
     customer: baseCustomer,
+    driver: baseDriver,
     paymentMode: "full",
     ...overrides,
   };
@@ -53,6 +54,7 @@ function propertyOnlyInput(overrides: Partial<CreateBookingInput> = {}): CreateB
       guests: 2,
     },
     customer: baseCustomer,
+    driver: baseDriver,
     paymentMode: "full",
     ...overrides,
   };
@@ -214,6 +216,7 @@ describe("computeBookingPlan — vehicle + property", () => {
       propertyId: null,
       propertyDates: null,
       customer: baseCustomer,
+    driver: baseDriver,
       paymentMode: "full",
     };
     expect(() => computeBookingPlan(empty, null, null)).toThrow(/Sélection vide/);
