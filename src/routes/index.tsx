@@ -1292,6 +1292,68 @@ function ageInYears(birthDateISO: string): number | null {
   return age;
 }
 
+function DocUploadField({
+  label,
+  doc,
+  onChange,
+  onClear,
+}: {
+  label: string;
+  doc: UploadedDoc | null;
+  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  onClear: () => void;
+}) {
+  const inputId = `upload-${label.replace(/\s+/g, "-").toLowerCase()}`;
+  return (
+    <div>
+      <label htmlFor={inputId} className="text-sm text-neutral-700 mb-2 block">
+        {label}
+      </label>
+      {doc ? (
+        <div className="flex items-center gap-3 p-3 rounded-xl bg-neutral-50 ring-1 ring-black/5">
+          {doc.type.startsWith("image/") ? (
+            <img
+              src={doc.previewUrl}
+              alt={doc.name}
+              className="w-14 h-14 rounded-lg object-cover ring-1 ring-black/10"
+            />
+          ) : (
+            <div className="w-14 h-14 rounded-lg bg-white ring-1 ring-black/10 flex items-center justify-center text-xs text-neutral-500">
+              PDF
+            </div>
+          )}
+          <div className="flex-1 min-w-0">
+            <p className="text-sm truncate">{doc.name}</p>
+            <p className="text-xs text-neutral-500">{(doc.size / 1024).toFixed(0)} Ko</p>
+          </div>
+          <button
+            type="button"
+            onClick={onClear}
+            className="text-xs text-red-600 hover:underline"
+          >
+            Retirer
+          </button>
+        </div>
+      ) : (
+        <input
+          id={inputId}
+          type="file"
+          accept="image/jpeg,image/png,image/webp,application/pdf"
+          onChange={onChange}
+          className="block w-full text-sm text-neutral-600 file:mr-3 file:py-2 file:px-4 file:rounded-full file:border-0 file:bg-brand/10 file:text-brand file:font-medium hover:file:bg-brand/20 cursor-pointer"
+        />
+      )}
+    </div>
+  );
+}
+
+  const now = new Date();
+  let age = now.getFullYear() - d.getFullYear();
+  const m = now.getMonth() - d.getMonth();
+  if (m < 0 || (m === 0 && now.getDate() < d.getDate())) age--;
+  return age;
+}
+
 function CustomerStep() {
 
   const { state, dispatch } = useBooking();
