@@ -1277,10 +1277,15 @@ function CustomerStep() {
   const [secondDriver, setSecondDriver] = useState(false);
   const [secondDriverName, setSecondDriverName] = useState("");
   const [secondDriverLicense, setSecondDriverLicense] = useState("");
+  const [secondDriverBirth, setSecondDriverBirth] = useState("");
   const [consentLicense, setConsentLicense] = useState(false);
   const [consentDeposit, setConsentDeposit] = useState(false);
   const [consentTerms, setConsentTerms] = useState(false);
-  const consentsMissing = showDriver && (!consentLicense || !consentDeposit || !consentTerms);
+  const [licenseFile, setLicenseFile] = useState<UploadedDoc | null>(null);
+  const [idFile, setIdFile] = useState<UploadedDoc | null>(null);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [showErrors, setShowErrors] = useState(false);
+
 
 
   const rule = PHONE_RULES[dial];
