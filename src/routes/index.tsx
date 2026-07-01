@@ -1274,6 +1274,14 @@ function CustomerStep() {
   const [showDriver, setShowDriver] = useState(
     state.bookingType === "vehicle" || state.bookingType === "both",
   );
+  const [secondDriver, setSecondDriver] = useState(false);
+  const [secondDriverName, setSecondDriverName] = useState("");
+  const [secondDriverLicense, setSecondDriverLicense] = useState("");
+  const [consentLicense, setConsentLicense] = useState(false);
+  const [consentDeposit, setConsentDeposit] = useState(false);
+  const [consentTerms, setConsentTerms] = useState(false);
+  const consentsMissing = showDriver && (!consentLicense || !consentDeposit || !consentTerms);
+
 
   const rule = PHONE_RULES[dial];
   const phoneExample = rule
